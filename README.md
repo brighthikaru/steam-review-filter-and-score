@@ -89,4 +89,4 @@ data/raw/                # raw review CSVs
 
 ---
 
-Sean (Hikaru) — Institute of Data, Data Science & AI Capstone
+Sean C — Institute of Data, Data Science & AI Capstone
