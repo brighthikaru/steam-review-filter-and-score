@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Steam Review Filter and Score — Capstone Presentation</title>
+<style>
+  :root {
+    --bg: #0f1115;
+    --panel: #171a21;
+    --accent: #66c0f4;
+    --accent2: #a4d007;
+    --text: #e8eaed;
+    --muted: #9aa3ad;
+    --danger: #e05c5c;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    scroll-behavior: smooth;
+  }
+  .deck {
+    height: 100vh;
+    overflow-y: scroll;
+    scroll-snap-type: y mandatory;
+  }
+  section {
+    height: 100vh;
+    scroll-snap-align: start;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 6vh 8vw;
+    position: relative;
+    border-bottom: 1px solid #2a2e37;
+  }
+  section .kicker {
+    color: var(--accent);
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+  }
+  h1 { font-size: 3rem; margin: 0 0 0.5rem 0; line-height: 1.1; }
+  h2 { font-size: 2.2rem; margin: 0 0 1rem 0; }
+  p.lead { font-size: 1.3rem; color: var(--muted); max-width: 780px; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 3rem; align-items: center; }
+  .grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1.5rem; }
+  table { border-collapse: collapse; width: 100%; font-size: 0.95rem; }
+  th, td { text-align: left; padding: 0.5rem 0.9rem; border-bottom: 1px solid #2a2e37; }
+  th { color: var(--accent); font-weight: 600; }
+  tr:last-child td { border-bottom: none; }
+  .card {
+    background: var(--panel);
+    border: 1px solid #2a2e37;
+    border-radius: 10px;
+    padding: 1.4rem 1.6rem;
+  }
+  .stat { font-size: 2.4rem; font-weight: 700; color: var(--accent2); }
+  .stat-label { color: var(--muted); font-size: 0.95rem; }
+  .badge {
+    display: inline-block; padding: 0.15rem 0.6rem; border-radius: 999px;
+    font-size: 0.8rem; font-weight: 600; margin-left: 0.5rem;
+  }
+  .badge.good { background: rgba(164,208,7,0.15); color: var(--accent2); }
+  .badge.mixed { background: rgba(224,92,92,0.15); color: var(--danger); }
+  img.chart { max-width: 100%; border-radius: 8px; border: 1px solid #2a2e37; }
+  ul.bullets { font-size: 1.05rem; line-height: 1.7; color: var(--text); }
+  ul.bullets li { margin-bottom: 0.6rem; }
+  .muted { color: var(--muted); }
+  code { background: #1f232c; padding: 0.1rem 0.4rem; border-radius: 4px; font-size: 0.9em; }
+  .progress {
+    position: fixed; top: 0; left: 0; height: 4px; background: var(--accent);
+    z-index: 10; transition: width 0.1s linear;
+  }
+  .nav-dots {
+    position: fixed; right: 20px; top: 50%; transform: translateY(-50%);
+    display: flex; flex-direction: column; gap: 10px; z-index: 10;
+  }
+  .nav-dots a {
+    width: 9px; height: 9px; border-radius: 50%; background: #3a3f4a;
+    display: block; transition: background 0.2s;
+  }
+  .nav-dots a:hover, .nav-dots a.active { background: var(--accent); }
+  .demo-frame-wrap {
+    background: var(--panel); border: 1px solid #2a2e37; border-radius: 10px;
+    padding: 1rem; height: 60vh;
+  }
+  iframe.demo { width: 100%; height: 100%; border: none; border-radius: 6px; background: #fff; }
+  .demo-fallback {
+    display: flex; align-items: center; justify-content: center;
+    height: 100%; color: var(--muted); text-align: center; padding: 2rem;
+  }
+  footer.slide-footer { position: absolute; bottom: 2vh; left: 8vw; color: var(--muted); font-size: 0.85rem; }
+</style>
+</head>
+<body>
+
+<div class="progress" id="progressBar"></div>
+<div class="nav-dots" id="navDots"></div>
+
+<div class="deck" id="deck">
+
+  <!-- 1. Title -->
+  <section id="slide-title">
+    <div class="kicker">Capstone Project — Data Science &amp; AI</div>
+    <h1>Steam Review Filter and Score</h1>
+    <p class="lead">Recovering a game's genuine player sentiment by filtering out low-quality, off-topic, and review-bombed reviews — with a live demo you can run on any game.</p>
+    <footer class="slide-footer">Sean Chia · Institute of Data</footer>
+  </section>
+
+  <!-- 2. Business problem -->
+  <section id="slide-problem">
+    <div class="kicker">Business Problem</div>
+    <h2>Steam's aggregate score can lie to you</h2>
+    <div class="grid2">
+      <div>
+        <p class="lead">Review bombs, off-topic complaints, and one-word "reviews" all count equally toward a game's public score — even though Steam already knows some of this activity is coordinated noise.</p>
+        <ul class="bullets">
+          <li><strong>Stakeholders:</strong> players deciding whether to buy, developers/publishers protecting reputation, and Steam itself — which partially filters this internally but never exposes a "genuine sentiment" score.</li>
+          <li><strong>Business question:</strong> can we recover a game's genuine sentiment after filtering out low-quality/bombing reviews, in a Steam-comparable score?</li>
+          <li><strong>Data question:</strong> can review text + metadata separate genuine reviews from low-quality/bombing ones reliably enough to trust the result?</li>
+        </ul>
+      </div>
+      <div class="card">
+        <div class="stat">1.3%</div>
+        <div class="stat-label">of reviews tagged "english" by Steam were actually written in another language entirely — one of several data-quality problems this project had to solve before modelling could even start.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 3. Data -->
+  <section id="slide-data">
+    <div class="kicker">Dataset</div>
+    <h2>4 games, ~16,000 reviews, pulled live from Steam's API</h2>
+    <table>
+      <tr><th>Game</th><th>Baseline reviews</th><th>Bomb-window reviews</th><th>Role in this project</th></tr>
+      <tr><td>Helldivers 2</td><td>3,988</td><td>—</td><td>Baseline comparison</td></tr>
+      <tr><td>War Thunder</td><td>3,929</td><td>—</td><td>Baseline comparison</td></tr>
+      <tr><td>Team Fortress 2</td><td>3,916</td><td>—</td><td>Baseline comparison</td></tr>
+      <tr><td>Slay the Spire 2</td><td>2,476</td><td>1,485</td><td><strong>Primary review-bomb case study</strong></td></tr>
+    </table>
+    <p class="muted" style="margin-top:1.5rem; max-width:800px;">
+      Scoped to <strong>English-language reviews only</strong> — a human has to be able to verify a sentiment call to defend it. Steam's own <code>language</code> filter turned out to be a reviewer-selected tag, not a content check, so a second content-based filter (non-Latin script detection) dropped a further 206 mistagged reviews.
+    </p>
+    <footer class="slide-footer">Source: Steam's public appreviews API, <code>filter_offtopic_activity=0</code> so bomb-window reviews aren't silently hidden.</footer>
+  </section>
+
+  <!-- 4. EDA -->
+  <section id="slide-eda">
+    <div class="kicker">Exploratory Data Analysis</div>
+    <h2>The signal was visible before any model touched it</h2>
+    <div class="grid2">
+      <div>
+        <img class="chart" src="assets/review_length_hist.png" alt="Review length distribution">
+        <p class="muted" style="font-size:0.9rem;">A real spike near zero — a meaningful share of reviews are just a handful of characters.</p>
+      </div>
+      <div>
+        <img class="chart" src="assets/bomb_volume_chart.png" alt="Daily review volume, bomb window vs baseline">
+        <p class="muted" style="font-size:0.9rem;">Slay the Spire 2's daily volume, cleanly separated into bomb-window vs. baseline slices.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 5. Feature engineering -->
+  <section id="slide-features">
+    <div class="kicker">Feature Engineering</div>
+    <h2>Five features, each with a business reason to exist</h2>
+    <table>
+      <tr><th>Feature</th><th>Why it matters</th></tr>
+      <tr><td><code>is_very_short</code></td><td>Near-zero-effort reviews carry little information about the game itself.</td></tr>
+      <tr><td><code>is_low_playtime</code></td><td>A strong opinion after minutes is a different signal than one after real engagement.</td></tr>
+      <tr><td><code>is_duplicate_text</code></td><td>Coordinated campaigns often reuse the same slogan across many accounts.</td></tr>
+      <tr><td><code>daily_volume_zscore</code></td><td>The core bomb signal — how abnormal is today's volume vs. this game's own normal pace?</td></tr>
+      <tr><td><code>is_new_reviewer</code></td><td>Throwaway/pile-on accounts often have no review history.</td></tr>
+    </table>
+    <p class="muted" style="margin-top:1rem;">Leakage-safe by design: every reference statistic ("what's normal for this game") is fit on the training split only, never on data the model will later be judged against.</p>
+  </section>
+
+  <!-- 6. Model 1 -->
+  <section id="slide-model1">
+    <div class="kicker">Model 1 — Quality / Review-Bomb Detection</div>
+    <h2>Three algorithms, one honest iteration story</h2>
+    <table>
+      <tr><th>Model</th><th>Precision</th><th>Recall</th><th>F1</th><th>ROC-AUC</th></tr>
+      <tr><td>Isolation Forest (unsupervised)</td><td>0.042</td><td>0.040</td><td>0.041</td><td>0.361</td></tr>
+      <tr><td>Logistic Regression, structural only</td><td>0.154</td><td>0.793</td><td>0.258</td><td>0.683</td></tr>
+      <tr><td><strong>Logistic Regression, structural + text (TF-IDF)</strong></td><td><strong>0.282</strong></td><td>0.697</td><td><strong>0.402</strong></td><td><strong>0.847</strong></td></tr>
+    </table>
+    <p class="lead" style="font-size:1.05rem; margin-top:1.5rem;">
+      Adding the review text itself nearly doubled precision and closed most of the accuracy gap left by an earlier language-based feature we deliberately removed (see next slide). Top words pushing a review toward "bomb-like": <code>anita</code>, <code>dei</code>, <code>sarkeesian</code>, <code>woke</code> — the model is keying on the actual controversy, not noise.
+    </p>
+  </section>
+
+  <!-- 7. Model 2 -->
+  <section id="slide-model2">
+    <div class="kicker">Model 2 — Sentiment Scoring</div>
+    <h2>Classical ML vs. deep learning — closer than you'd think</h2>
+    <table>
+      <tr><th>Model</th><th>Precision</th><th>Recall</th><th>F1</th><th>ROC-AUC</th></tr>
+      <tr><td>LSTM (deep learning)</td><td>0.922</td><td>0.904</td><td>0.913</td><td>0.899</td></tr>
+      <tr><td>TF-IDF + Logistic Regression (classical ML)</td><td>0.942</td><td>0.877</td><td>0.908</td><td>0.928</td></tr>
+    </table>
+    <p class="lead" style="font-size:1.05rem; margin-top:1.5rem;">
+      Deep learning's extra capacity isn't paying off much at this data volume (~11k training rows) — a real, honest finding, and the reason the live app uses the simpler model.
+    </p>
+  </section>
+
+  <!-- 8. Aggregate scoring result -->
+  <section id="slide-result">
+    <div class="kicker">Result</div>
+    <h2>The headline number: filtering changes the score</h2>
+    <div class="grid2">
+      <table>
+        <tr><th>Game</th><th>Before filter</th><th>After filter</th></tr>
+        <tr><td>Helldivers 2</td><td>79.4%</td><td>78.6%</td></tr>
+        <tr><td>War Thunder</td><td>52.1%</td><td>49.5%</td></tr>
+        <tr><td>Team Fortress 2</td><td>93.9%</td><td>93.7%</td></tr>
+        <tr><td><strong>Slay the Spire 2</strong></td><td><strong>85.0%</strong></td><td><strong>89.7%</strong></td></tr>
+      </table>
+      <div class="card">
+        <div class="stat-label">Steam's own live all-time score for Slay the Spire 2:</div>
+        <div class="stat">60.4% <span class="badge mixed">Mixed</span></div>
+        <p class="muted" style="margin-top:1rem; font-size:0.95rem;">Our sample only covers a ~2-week window around the bomb, English-only — this recovers <em>English-speaking-reviewer</em> sentiment for that window, not Steam's full multilingual all-time score. Stated plainly, not hidden.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 9. Live demo -->
+  <section id="slide-demo">
+    <div class="kicker">Live Demo</div>
+    <h2>Try it on any game, right now</h2>
+    <div class="demo-frame-wrap">
+      <iframe class="demo" id="demoFrame" src="http://localhost:8501/?embed=true"></iframe>
+    </div>
+    <p class="muted" style="margin-top:1rem;">
+      Running locally at <code>localhost:8501</code> — start it before presenting with <code>streamlit run app.py</code>.
+      If the frame above is blank, the app isn't running yet, or open it directly in a new tab as a fallback.
+    </p>
+  </section>
+
+  <!-- 10. Conclusion -->
+  <section id="slide-conclusion">
+    <div class="kicker">Conclusion &amp; Future Work</div>
+    <h2>What this proves, and what's next</h2>
+    <div class="grid2">
+      <div>
+        <p class="lead" style="font-size:1.1rem;">A supervised classifier beats unsupervised anomaly detection for bomb detection (ROC-AUC 0.847 vs. 0.361). Adding the review's own text recovered nearly all the accuracy lost by an English-only scope decision — without reintroducing anything unverifiable.</p>
+      </div>
+      <div class="card">
+        <ul class="bullets" style="font-size:1rem;">
+          <li>Second, independent bomb case study to confirm the pattern generalises</li>
+          <li>Per-language models to extend beyond English, without translation errors</li>
+          <li>Calibrate the quality threshold to a specific precision/recall target</li>
+          <li>Deploy the live app publicly (Streamlit Community Cloud)</li>
+        </ul>
+      </div>
+    </div>
+    <footer class="slide-footer">Full methodology, leakage checks, and limitations: project notebook &amp; documentation.</footer>
+  </section>
+
+</div>
+
+<script>
+  const sections = Array.from(document.querySelectorAll('section'));
+  const navDots = document.getElementById('navDots');
+  const progressBar = document.getElementById('progressBar');
+  const deck = document.getElementById('deck');
+
+  sections.forEach((s, i) => {
+    const dot = document.createElement('a');
+    dot.href = '#' + s.id;
+    navDots.appendChild(dot);
+  });
+
+  function updateActive() {
+    const scrollTop = deck.scrollTop;
+    const total = deck.scrollHeight - deck.clientHeight;
+    progressBar.style.width = (total > 0 ? (scrollTop / total) * 100 : 0) + '%';
+
+    let activeIdx = 0;
+    sections.forEach((s, i) => {
+      if (s.offsetTop - deck.offsetTop <= scrollTop + window.innerHeight / 2) activeIdx = i;
+    });
+    Array.from(navDots.children).forEach((d, i) => d.classList.toggle('active', i === activeIdx));
+  }
+
+  deck.addEventListener('scroll', updateActive);
+  window.addEventListener('load', updateActive);
+</script>
+
+</body>
+</html>
