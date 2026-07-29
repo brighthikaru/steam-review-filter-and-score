@@ -44,33 +44,36 @@ HOW it works (read this before you run it):
         sample (which would have unevenly shrunk each game/slice instead
         of giving properly-sized English-only pulls).
 
-    For games with a known review-bomb event, we pull two separate
-    slices instead of one blind pull:
-      1. A "bomb window" slice -- reviews created during the known
-         incident dates, which is where the review-bomb signal actually
-         lives.
-      2. A "baseline" slice -- reviews from a specific *pre-bomb* date
-         range, so your model has clean non-bombed examples to compare
-         against. This is deliberately an explicit past window, not
-         "whatever's most recent" -- pulling the newest reviews as
-         "baseline" would silently mix in post-bomb-era discussion/
-         backlash and undermine the comparison.
+    PROJECT SCOPE CHANGE (2026-07-29): earlier versions of this script
+    pulled a separate "bomb window" slice for games with a known
+    review-bomb event, so a temporal (timing-based) feature could try to
+    detect the bomb directly. That approach was dropped after two
+    findings during modelling: (1) a text-based quality model trained on
+    "was this review from the bomb window" ended up learning words
+    specific to that one controversy rather than a generalisable
+    "low-quality review" signal, and (2) tree-based models exploited a
+    confound in the temporal z-score feature caused by how narrowly the
+    one bomb-window sample was collected, rather than learning a real
+    "abnormal volume" signal (see the notebook's Model 1 section for the
+    full investigation). The project's actual goal is a language-based
+    filter that judges review quality from the text itself, not a
+    bomb-timing detector -- so every game below is now pulled the same
+    simple way: the most recent `TARGET_PER_GAME` English reviews, no
+    special windows, no bomb/baseline split. Any review-bombing or
+    monetisation-backlash context for a given game (e.g. Tekken 8's
+    2024 monetisation controversy) is noted in the project documentation
+    as real-world context for why a game's sentiment may look mixed --
+    not something the pipeline tries to detect from timing.
 
-    IMPORTANT LESSON LEARNED (2026-07-22): Steam's cursor pagination for
-    the "recent"/"updated" filters only reliably reaches back so far for
-    high-volume games -- in testing, pulling a bomb window from over a
-    year ago (War Thunder May 2023, Helldivers 2 May 2024) returned 0
-    results even after the pull otherwise completed normally. This is a
-    known limitation of the API itself (community-reported), not a bug
-    in this script's logic (the window-filtering logic was unit-tested
-    and is correct). Practical takeaway: only target bomb windows that
-    are recent (weeks to a few months old, not years), and expect that
-    older documented incidents for high-volume games may simply be
-    unreachable through this endpoint. Helldivers 2, War Thunder, and TF2
-    are kept below as "baseline-only" normal-sentiment comparison games
-    (no bomb_window) since their historical incidents are too old to
-    reach; Slay the Spire 2 is the live bomb-window case study instead,
-    since its incident is only ~2.5 months old as of this writing.
+    IMPORTANT LESSON LEARNED (2026-07-22, kept for reference): Steam's
+    cursor pagination for the "recent"/"updated" filters only reliably
+    reaches back so far for high-volume games -- in testing, pulling
+    reviews from over a year ago (War Thunder May 2023, Helldivers 2 May
+    2024) returned 0 results even after the pull otherwise completed
+    normally. This is a known limitation of the API itself
+    (community-reported). Practical takeaway, still relevant now that
+    every pull is "most recent N reviews": don't expect to reach deep
+    into a high-volume game's history this way.
 
 USAGE:
     python collect_reviews.py                # pull all games below
@@ -92,65 +95,74 @@ import requests
 # ---------------------------------------------------------------------------
 
 # appid: the numeric Steam app ID (verified live against the Steam API).
-# bomb_window: (start, end) as "YYYY-MM-DD" -- dates of a documented
-#   review-bomb incident. None if there isn't a reachable one (see note
-#   above about how old is "too old" for this API).
-# baseline_window: (start, end) as "YYYY-MM-DD" -- a clean pre-bomb (or
-#   otherwise "normal") date range to sample as comparison data. None
-#   means "just grab the most recent reviews" (fine when there's no
-#   bomb_window to avoid overlapping with).
+# genre: noted for the project write-up (EDA/dataset diversity), not used
+#   by any pipeline code.
+# All games are pulled the same way -- most recent TARGET_PER_GAME
+# English reviews, no special date windows. See the module docstring
+# above for why the earlier bomb-window/baseline-window split was
+# dropped.
 GAMES = [
     {
         "appid": 553850,
         "name": "Helldivers 2",
-        # Verified live 2026-07-18: 629,255 total reviews, "Very Positive"
-        # overall. Known bomb (May 2024, Sony PSN linking backlash) is too
-        # old to reach via cursor pagination -- confirmed by testing on
-        # 2026-07-22 (0 results). Kept as a baseline-only comparison game.
-        "bomb_window": None,
-        "baseline_window": None,
-    },
-    {
-        "appid": 236390,
-        "name": "War Thunder",
-        # Verified live 2026-07-18: 767,980 total reviews, "Mostly Positive"
-        # overall. Known bomb (May 2023, economy changes) unreachable --
-        # confirmed by testing on 2026-07-22 (0 results). Baseline-only.
-        "bomb_window": None,
-        "baseline_window": None,
+        "genre": "Co-op shooter",
+        # Verified live 2026-07-18: 629,255 total reviews, "Very Positive".
     },
     {
         "appid": 440,
         "name": "Team Fortress 2",
-        # Verified live 2026-07-18: 1,242,227 total reviews, "Very
-        # Positive" overall. Known bomb (mid-2024, bot/cheater protest)
-        # is both old and this is the highest-volume game in the set --
-        # cursor depth is even less likely to reach it. Baseline-only.
-        "bomb_window": None,
-        "baseline_window": None,
+        "genre": "Multiplayer FPS",
+        # Verified live 2026-07-18: 1,242,227 total reviews, "Very Positive".
     },
     {
         "appid": 2868840,
         "name": "Slay the Spire 2",
+        "genre": "Deck-building roguelike",
         # Verified live 2026-07-22: 191,251 total reviews, "Mixed" overall
-        # (down from "Overwhelmingly Positive"). Review-bombed starting
-        # 2026-05-05 after Anita Sarkeesian's credit as an inclusivity
-        # consultant spread on X; rating fell to 61% positive within two
-        # days. Released 2026-03-05 (early access), so there's a genuine
-        # ~2-month pre-bomb baseline window to sample. This is the
-        # primary review-bomb case study -- recent enough that cursor
-        # pagination can actually reach both windows.
-        "bomb_window": ("2026-05-05", "2026-05-15"),
-        "baseline_window": ("2026-03-05", "2026-05-04"),
+        # (down from "Overwhelmingly Positive") following a 2026-05-05
+        # controversy over a consultant credit. Kept in the dataset for
+        # its genuinely mixed, sometimes-heated review text -- exactly
+        # the kind of real-world noise the language-based quality filter
+        # needs to be able to handle -- but no longer pulled with a
+        # special bomb-window/baseline split (see module docstring).
+    },
+    {
+        "appid": 1551360,
+        "name": "Forza Horizon 5",
+        "genre": "Racing",
+        # Verified live 2026-07-29: 97,851 total reviews, "Very Positive".
+    },
+    {
+        "appid": 3764200,
+        "name": "Resident Evil Requiem",
+        "genre": "Survival horror / adventure",
+        # Verified live 2026-07-29: 78,953 total reviews, "Overwhelmingly
+        # Positive". Released Feb 2026, so review volume is naturally
+        # more contained than the older AAA titles in this set.
+    },
+    {
+        "appid": 1778820,
+        "name": "Tekken 8",
+        "genre": "Fighting",
+        # Verified live 2026-07-29: 43,183 total reviews, review_score 5
+        # ("Mixed") -- real, ongoing negativity tied to a monetisation
+        # controversy (battle pass / in-game store backlash). Included
+        # deliberately for its mixed real-world sentiment, but NOT set up
+        # as a bomb-window case study -- any monetisation-driven
+        # negativity here is noted as real-world context in the project
+        # documentation, not something the pipeline tries to detect.
     },
 ]
 
-# How many reviews to aim for per game, split between the bomb window (if
-# any) and a normal baseline sample. Keep this modest -- pulling every
-# review for a game with hundreds of thousands of them is unnecessary data
-# volume for this project and will just slow down every re-run.
-TARGET_PER_GAME = 4000
-BOMB_WINDOW_TARGET = 1500  # only used for games that have a bomb_window
+# How many reviews to aim for per game. Kept equal across every game so
+# no single title dominates what the language-based quality/sentiment
+# models learn as "normal" text. 8,000 is a deliberate middle ground
+# between the original 4,000 and pulling a game's entire review history
+# (Team Fortress 2 alone has 1.24M lifetime reviews -- "all reviews" for
+# every game here would mean hours of paginated requests per game and a
+# training set large enough to slow down every retrain, for no real
+# modelling benefit once you have a large, diverse sample).
+TARGET_PER_GAME = 8000
 
 OUTPUT_DIR = os.path.join(os.path.dirname(__file__), "..", "data", "raw")
 
@@ -330,35 +342,19 @@ def main():
     for game in games_to_pull:
         appid = game["appid"]
         name = game["name"]
-        bomb_window = game.get("bomb_window")
-        baseline_window = game.get("baseline_window")
 
         print(f"Pulling reviews for {name} (appid {appid})...")
 
-        all_rows = []
+        # Every game: most recent TARGET_PER_GAME English reviews, no
+        # date window. `_slice` is kept as "baseline" on every row purely
+        # so review_to_row()/save_csv() (and any older code that still
+        # reads a `slice` column) keep working unchanged -- it no longer
+        # carries any real meaning now that there's no bomb-window split.
+        all_rows = pull_reviews(appid, name, TARGET_PER_GAME)
+        for r in all_rows:
+            r["_slice"] = "baseline"
 
-        if bomb_window:
-            print(f"  fetching bomb-window sample {bomb_window} ...")
-            bomb_rows = pull_reviews(appid, name, BOMB_WINDOW_TARGET, window=bomb_window)
-            print(f"  got {len(bomb_rows)} bomb-window reviews")
-            for r in bomb_rows:
-                r["_slice"] = "bomb_window"
-            all_rows.extend(bomb_rows)
-
-            baseline_target = TARGET_PER_GAME - len(bomb_rows)
-            print(f"  fetching baseline sample {baseline_window} (target {baseline_target}) ...")
-            baseline_rows = pull_reviews(appid, name, baseline_target, window=baseline_window)
-            for r in baseline_rows:
-                r["_slice"] = "baseline"
-            all_rows.extend(baseline_rows)
-        else:
-            # No known/reachable bomb window -- just a normal comparison
-            # sample. baseline_window may still be set if you want a
-            # specific date range rather than "most recent".
-            all_rows = pull_reviews(appid, name, TARGET_PER_GAME, window=baseline_window)
-            for r in all_rows:
-                r["_slice"] = "baseline"
-
+        print(f"  got {len(all_rows)} reviews")
         save_csv(all_rows, appid, name)
         time.sleep(1)  # be polite between games
 

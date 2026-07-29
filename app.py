@@ -2,15 +2,22 @@
 app.py
 
 Streamlit demo: type a game's name (or its Steam appid), pull its most
-recent English-language reviews live, filter out likely low-quality /
-review-bomb reviews with the trained model, and show the filtered
-sentiment score next to the raw one.
+recent English-language reviews live, filter out likely low-effort/junk
+reviews with the trained quality model, and show the "real sentiment"
+score before vs. after filtering -- plus a side-by-side comparison of
+our own sentiment model's prediction against Steam's real vote.
 
 This is the "end-to-end solution (UI, model, data, infrastructure)"
-deliverable -- it reuses the exact same src/features.py pipeline code
-the notebook does, and the exact model trained by train_models.py, so
-there is exactly one implementation of "how do we compute this
-feature" or "how do we score this review" in the whole project.
+deliverable -- it reuses the exact same src/features.py and
+live_scoring.py pipeline code the notebook's approach is built on, and
+the exact models trained by train_models.py, so there is exactly one
+implementation of "how do we score this review" in the whole project.
+
+WHAT changed (2026-07-29): the quality filter is now a purely
+language-based model (no structural features, no per-game timing
+baseline) -- see the notebook's Section 5 for why. The app also now
+loads a sentiment model and shows its prediction next to Steam's real
+vote, rather than relying solely on Steam's vote as before.
 
 RUN:
     streamlit run app.py
@@ -27,14 +34,14 @@ import streamlit as st
 # same convention the notebook uses (sys.path.append("../src") there
 # vs. "src" here since this file's own location is the project root).
 sys.path.append("src")
-from live_scoring import QualityModel, score_game, to_steam_category
+from live_scoring import QualityModel, SentimentModel, score_game
 
 st.set_page_config(page_title="Steam Review Filter & Score", page_icon="🎮", layout="centered")
 
 
 @st.cache_resource
-def load_model():
-    return QualityModel()
+def load_models():
+    return QualityModel(), SentimentModel()
 
 
 def search_appid_by_name(term):
@@ -62,32 +69,34 @@ def search_appid_by_name(term):
 
 st.title("🎮 Steam Review Filter & Score")
 st.caption(
-    "Pulls a game's recent English-language reviews, filters out reviews our model "
-    "flags as low-quality or review-bomb-driven, and compares the sentiment score "
-    "before vs. after filtering."
+    "Pulls a game's recent English-language reviews, filters out ones our model flags "
+    "as low-effort/junk, and shows the real sentiment score before vs. after -- alongside "
+    "our own sentiment model's prediction compared to Steam's real vote."
 )
 
 with st.expander("How this works, and what it can't do"):
     st.markdown(
         """
-- Reviews are pulled live from Steam's public API (`filter_offtopic_activity=0`,
-  so review-bomb reviews aren't silently hidden the way Steam's default view hides them).
-- The quality filter is a Logistic Regression trained on structural features
-  (length, playtime, duplicate text, posting-time clustering) **and** the review
-  text itself (TF-IDF) -- see the project notebook, Section 5, for how it was
-  built and validated (ROC-AUC 0.847 on held-out test data).
+- Reviews are pulled live from Steam's public API.
+- The **quality filter** is a Logistic Regression trained on review text alone (TF-IDF)
+  to predict a game-agnostic "low-effort" label (very short, low playtime, or duplicate
+  text) -- see the project notebook, Section 5 (ROC-AUC 0.96, consistent across six
+  different game genres in testing). It needs nothing but the text, so it works the
+  same way for any game, not just ones it was trained on.
+- The **sentiment model** (Section 6) predicts positive/negative from text alone,
+  independent of Steam's own vote -- shown here side-by-side with Steam's real vote
+  as a built-in accuracy check (they agree 83-94% of the time across the games tested).
 - Scoring is scoped to **English-language reviews only** -- both by requesting
   `language=english` from Steam and by dropping any review containing non-Latin
-  script, since a review that can't be manually verified isn't defensible.
-  For games with a large non-English review base, this score reflects
-  English-speaking reviewers specifically, not the full community.
-- For games outside the notebook's original 4-game training set (which is
-  every game you search here), the "what's a normal day" baseline is computed
-  from the batch of reviews just pulled, not a separately verified pre-bombing
-  period. If a game is in the middle of an unbroken, ongoing review-bomb with
-  no quiet days in the pulled sample, the filter has no "quiet" period to
-  contrast against and may under-flag. This is a known trade-off, not a bug --
-  see the project documentation for the full discussion.
+  script, since a review that can't be manually verified isn't defensible. For games
+  with a large non-English review base, this score reflects English-speaking
+  reviewers specifically, not the full community.
+- An earlier version of this project also tried to detect coordinated review-bomb
+  campaigns using posting-time patterns; that approach didn't generalise to games
+  outside its training set and was dropped -- see the notebook's Section 5.7 for
+  the full story. Negativity driven by something other than gameplay (e.g. a
+  monetisation controversy) is treated here as genuine sentiment, not noise to
+  filter out.
         """
     )
 
@@ -115,8 +124,8 @@ if query:
 
 if appid and st.button("Score this game", type="primary"):
     with st.spinner(f"Pulling reviews for {game_name or appid}..."):
-        model = load_model()
-        result = score_game(appid, game_name or str(appid), model)
+        quality_model, sentiment_model = load_models()
+        result = score_game(appid, game_name or str(appid), quality_model, sentiment_model)
 
     if "error" in result:
         st.error(result["error"])
@@ -148,7 +157,17 @@ if appid and st.button("Score this game", type="primary"):
         st.markdown(
             f"Pulled **{result['n_pulled']}** reviews, dropped **{result['n_dropped_non_english']}** "
             f"for non-English content, scored **{result['n_scored']}**, and flagged "
-            f"**{result['n_flagged']}** ({result['pct_flagged']}%) as likely low-quality or bomb-driven."
+            f"**{result['n_flagged']}** ({result['pct_flagged']}%) as likely low-effort/junk."
+        )
+
+        st.divider()
+        st.markdown("##### Our sentiment model vs. Steam's real vote")
+        st.markdown(
+            f"Predicting sentiment from review text alone (no access to Steam's vote), our "
+            f"model agrees with the reviewer's actual thumbs up/down **{result['sentiment_agreement_pct']}%** "
+            f"of the time for this game. This is a built-in accuracy check: it's the same model "
+            f"that would let this pipeline judge sentiment from review text pulled from anywhere -- "
+            f"not just a source that happens to provide its own up/down vote like Steam does."
         )
 
         if len(result["sample_flagged_reviews"]):

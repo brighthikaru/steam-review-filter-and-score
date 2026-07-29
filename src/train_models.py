@@ -1,9 +1,10 @@
 """
 train_models.py
 
-Trains the quality/review-bomb filter on the project's 4-game dataset
-and saves the fitted pieces to disk, so the live demo app can load and
-score brand-new games without re-running the notebook.
+Trains both deployed models -- the language-based review-quality filter
+and the sentiment classifier -- on the project's 6-game dataset, and
+saves the fitted pieces to disk so the live demo app can load and score
+brand-new games without re-running the notebook.
 
 WHY a separate script, not "just import the notebook": a notebook is
 for exploring and justifying decisions with narrative and charts; this
@@ -12,15 +13,23 @@ model files) that a completely different program (app.py) depends on.
 Mixing the two would mean the app breaks any time someone edits the
 notebook's markdown or adds an exploratory cell.
 
-WHY the app doesn't also need the sentiment model (LSTM / TF-IDF+LogReg
-from Section 6 of the notebook): Steam's API already returns each
-review's own thumbs up/down (`voted_up`) alongside the text. The
-notebook's Section 7 (Aggregate Scoring) uses that real label as ground
-truth for both "before filter" and "after filter" percentages -- it
-never needs the sentiment model's *prediction* to compute a score, only
-the quality model's flag to decide which reviews to keep. So the only
-model this app needs to load is the quality/bomb filter. This keeps the
-app lightweight: no TensorFlow/Keras dependency at all.
+WHAT changed from the earlier version of this script (2026-07-29): the
+quality filter used to be a structural-features-plus-text model trained
+on "was this review posted during one specific game's bombing event."
+That approach was dropped -- see the notebook's Section 5.7 for why
+(it didn't generalise to games outside its training set). The quality
+filter here is now trained on review TEXT ALONE, predicting a
+game-agnostic "low-effort" proxy label (very-short OR low-playtime OR
+duplicate-text) -- see notebook Section 4.2/5. This also means the app
+no longer needs a StandardScaler or structural feature columns at
+inference time: the quality model only needs the review's text.
+
+This script also now trains and saves the SENTIMENT model (TF-IDF +
+Logistic Regression, notebook Section 6), which the earlier version
+deliberately skipped since the app used to rely solely on Steam's own
+`voted_up` field as ground truth. The app now shows the sentiment
+model's own prediction side-by-side with Steam's real vote (per
+Hikaru's request, 2026-07-29), so both models need to ship together.
 
 USAGE:
     python train_models.py
@@ -32,28 +41,23 @@ import os
 
 import joblib
 import pandas as pd
-from scipy.sparse import hstack, csr_matrix
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import precision_score, recall_score, f1_score, roc_auc_score
 from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import StandardScaler
 
 from features import (
     drop_non_english_reviews,
-    add_daily_review_count,
-    build_features_for_modeling,
+    add_length_features,
+    add_playtime_features,
+    add_author_features,
+    _normalize_text,
 )
 
 # This script lives in src/, alongside features.py and collect_reviews.py --
 # data/ and the models/ output directory are both one level up, at the
 # project root, matching collect_reviews.py's existing OUTPUT_DIR convention.
 MODELS_DIR = os.path.join(os.path.dirname(__file__), "..", "models")
-
-FEATURE_COLUMNS = [
-    "review_length_chars", "review_length_words", "is_very_short",
-    "playtime_at_review_hours", "is_low_playtime", "is_duplicate_text",
-    "daily_volume_zscore", "is_new_reviewer",
-]
 
 
 def load_raw_data():
@@ -62,58 +66,99 @@ def load_raw_data():
     return df_raw
 
 
+def add_low_effort_label(df):
+    """
+    Builds the game-agnostic "low-effort" proxy label used to train the
+    quality filter -- see notebook Section 4.2 for the full justification.
+    Purely structural (length/playtime/duplicate-text), no dependency on
+    any one game's controversy or timing.
+    """
+    df = add_length_features(df)
+    df = add_playtime_features(df)
+    df = add_author_features(df)
+
+    df = df.copy()
+    df["_normalized_review"] = df["review"].apply(_normalize_text)
+    non_empty = df["_normalized_review"] != ""
+    dup_counts = (
+        df[non_empty].groupby(["game_name", "_normalized_review"])["_normalized_review"]
+        .transform("count")
+    )
+    df["is_duplicate_text"] = False
+    df.loc[non_empty, "is_duplicate_text"] = dup_counts.gt(1).values
+    df = df.drop(columns=["_normalized_review"])
+
+    df["label"] = (df["is_very_short"] | df["is_low_playtime"] | df["is_duplicate_text"]).astype(int)
+    return df
+
+
+def train_quality_model(df):
+    print("\n--- Quality (low-effort review) filter ---")
+    quality_df = add_low_effort_label(df)
+
+    strat_key = quality_df["game_name"] + "_" + quality_df["label"].astype(str)
+    train_df, test_df = train_test_split(quality_df, test_size=0.3, random_state=42, stratify=strat_key)
+
+    vectorizer = TfidfVectorizer(max_features=3000, ngram_range=(1, 2), min_df=3)
+    X_train = vectorizer.fit_transform(train_df["review"].fillna(""))
+    X_test = vectorizer.transform(test_df["review"].fillna(""))
+    y_train = train_df["label"]
+    y_test = test_df["label"]
+
+    model = LogisticRegression(class_weight="balanced", max_iter=1000, random_state=42)
+    model.fit(X_train, y_train)
+
+    pred = model.predict(X_test)
+    score = model.predict_proba(X_test)[:, 1]
+    print(f"  test precision={precision_score(y_test, pred):.3f} recall={recall_score(y_test, pred):.3f} "
+          f"f1={f1_score(y_test, pred):.3f} roc_auc={roc_auc_score(y_test, score):.3f}")
+
+    return vectorizer, model
+
+
+def train_sentiment_model(df):
+    print("\n--- Sentiment model ---")
+    sentiment_df = df[df["review"].fillna("").str.strip() != ""].copy()
+    sentiment_df["label"] = sentiment_df["voted_up"].astype(int)
+
+    strat_key = sentiment_df["game_name"] + "_" + sentiment_df["label"].astype(str)
+    train_df, test_df = train_test_split(sentiment_df, test_size=0.3, random_state=42, stratify=strat_key)
+
+    vectorizer = TfidfVectorizer(max_features=5000, ngram_range=(1, 2), min_df=3)
+    X_train = vectorizer.fit_transform(train_df["review"])
+    X_test = vectorizer.transform(test_df["review"])
+    y_train = train_df["label"]
+    y_test = test_df["label"]
+
+    model = LogisticRegression(class_weight="balanced", max_iter=1000, random_state=42)
+    model.fit(X_train, y_train)
+
+    pred = model.predict(X_test)
+    score = model.predict_proba(X_test)[:, 1]
+    print(f"  test precision={precision_score(y_test, pred):.3f} recall={recall_score(y_test, pred):.3f} "
+          f"f1={f1_score(y_test, pred):.3f} roc_auc={roc_auc_score(y_test, score):.3f}")
+
+    return vectorizer, model
+
+
 def train():
     print("Loading raw data...")
     df_raw = load_raw_data()
+    print(f"  {df_raw.shape[0]} rows across {df_raw['game_name'].nunique()} games")
 
     print("Dropping non-English-script reviews...")
     df, dropped = drop_non_english_reviews(df_raw)
     print(f"  dropped {len(dropped)} of {len(df_raw)} rows")
 
-    df_raw = df.copy()
-    df_raw = add_daily_review_count(df_raw)
-    df_raw["label"] = (df_raw["slice"] == "bomb_window").astype(int)
-
-    strat_key = df_raw["game_name"] + "_" + df_raw["label"].astype(str)
-    train_raw, test_raw = train_test_split(
-        df_raw, test_size=0.3, random_state=42, stratify=strat_key
-    )
-
-    print("Building leakage-safe features...")
-    train_feat, test_feat, fitted_stats = build_features_for_modeling(train_raw, test_raw)
-
-    X_train_raw = train_feat[FEATURE_COLUMNS].astype(float)
-    y_train = train_feat["label"]
-    X_test_raw = test_feat[FEATURE_COLUMNS].astype(float)
-    y_test = test_feat["label"]
-
-    scaler = StandardScaler()
-    X_train = pd.DataFrame(scaler.fit_transform(X_train_raw), columns=FEATURE_COLUMNS, index=X_train_raw.index)
-    X_test = pd.DataFrame(scaler.transform(X_test_raw), columns=FEATURE_COLUMNS, index=X_test_raw.index)
-
-    print("Fitting TF-IDF vectorizer + text-enhanced Logistic Regression (final quality model)...")
-    quality_tfidf = TfidfVectorizer(max_features=3000, ngram_range=(1, 2), min_df=3)
-    train_text_tfidf = quality_tfidf.fit_transform(train_feat["review"].fillna(""))
-    test_text_tfidf = quality_tfidf.transform(test_feat["review"].fillna(""))
-
-    X_train_combined = hstack([csr_matrix(X_train.values), train_text_tfidf])
-    X_test_combined = hstack([csr_matrix(X_test.values), test_text_tfidf])
-
-    log_reg_text = LogisticRegression(class_weight="balanced", max_iter=1000, random_state=42)
-    log_reg_text.fit(X_train_combined, y_train)
-
-    from sklearn.metrics import precision_score, recall_score, f1_score, roc_auc_score
-    pred = log_reg_text.predict(X_test_combined)
-    score = log_reg_text.predict_proba(X_test_combined)[:, 1]
-    print(f"  test precision={precision_score(y_test, pred):.3f} recall={recall_score(y_test, pred):.3f} "
-          f"f1={f1_score(y_test, pred):.3f} roc_auc={roc_auc_score(y_test, score):.3f}")
+    quality_vectorizer, quality_model = train_quality_model(df)
+    sentiment_vectorizer, sentiment_model = train_sentiment_model(df)
 
     os.makedirs(MODELS_DIR, exist_ok=True)
-    joblib.dump(scaler, os.path.join(MODELS_DIR, "scaler.joblib"))
-    joblib.dump(quality_tfidf, os.path.join(MODELS_DIR, "quality_tfidf.joblib"))
-    joblib.dump(log_reg_text, os.path.join(MODELS_DIR, "quality_model.joblib"))
-    joblib.dump(FEATURE_COLUMNS, os.path.join(MODELS_DIR, "feature_columns.joblib"))
-    print(f"Saved artifacts to {MODELS_DIR}")
+    joblib.dump(quality_vectorizer, os.path.join(MODELS_DIR, "quality_tfidf.joblib"))
+    joblib.dump(quality_model, os.path.join(MODELS_DIR, "quality_model.joblib"))
+    joblib.dump(sentiment_vectorizer, os.path.join(MODELS_DIR, "sentiment_tfidf.joblib"))
+    joblib.dump(sentiment_model, os.path.join(MODELS_DIR, "sentiment_model.joblib"))
+    print(f"\nSaved artifacts to {MODELS_DIR}")
 
 
 if __name__ == "__main__":

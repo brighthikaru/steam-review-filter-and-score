@@ -113,31 +113,33 @@
   <section id="slide-title">
     <div class="kicker">Capstone Project — Data Science &amp; AI</div>
     <h1>Steam Review Filter and Score</h1>
-    <p class="lead">Recovering a game's genuine sentiment by filtering out low-quality and review-bombed reviews — demoed live, on any game.</p>
+    <p class="lead">Showing a game's real sentiment by filtering out low-effort, junk reviews — using nothing but the review text, demoed live on any game.</p>
     <div class="hero-collage">
       <img src="assets/helldivers2_header.png" alt="Helldivers 2">
-      <img src="assets/warthunder_header.png" alt="War Thunder">
       <img src="assets/tf2_header.png" alt="Team Fortress 2">
       <img src="assets/sts2_header.png" alt="Slay the Spire 2">
+      <img src="assets/forza_horizon5_header.png" alt="Forza Horizon 5">
+      <img src="assets/re_requiem_header.png" alt="Resident Evil Requiem">
+      <img src="assets/tekken8_header.png" alt="Tekken 8">
     </div>
-    <footer class="slide-footer">Sean Chia · Institute of Data</footer>
+    <footer class="slide-footer">Hikaru · Institute of Data</footer>
   </section>
 
   <!-- 2. Business problem -->
   <section id="slide-problem">
     <div class="kicker">Business Problem</div>
-    <h2>Steam's aggregate score can lie to you</h2>
+    <h2>A game's score mixes real opinions with junk</h2>
     <div class="grid2">
       <div>
-        <p class="lead">Review bombs and one-word "reviews" count equally toward a game's public score — even though Steam already knows some of it is coordinated noise.</p>
+        <p class="lead">A one-word "good game" and a considered, on-topic critique count equally toward a game's public score. That makes it hard to tell whether a score reflects genuine community sentiment, or is diluted by noise that says nothing about the game at all.</p>
         <ul class="bullets">
-          <li><strong>Stakeholders:</strong> players, developers/publishers, and Steam itself — which filters some of this internally but never shows a "genuine sentiment" score.</li>
-          <li><strong>Business question:</strong> can we recover genuine sentiment in a Steam-comparable score?</li>
-          <li><strong>Data question:</strong> can text + metadata separate genuine reviews from noise reliably enough to trust it?</li>
+          <li><strong>Stakeholders:</strong> players deciding whether to buy; developers/publishers reading feedback; Steam itself, which never surfaces a "real sentiment" score.</li>
+          <li><strong>Business question:</strong> can we produce a real sentiment score using nothing but the review text?</li>
+          <li><strong>Data question:</strong> does language alone carry a generalisable signal for sentiment AND quality, across genuinely different games?</li>
         </ul>
       </div>
       <div class="card">
-        <div class="stat">1.3%</div>
+        <div class="stat">1.2%</div>
         <div class="stat-label">of reviews tagged "english" by Steam were actually written in another language — one data-quality problem this project had to solve first.</div>
       </div>
     </div>
@@ -146,18 +148,20 @@
   <!-- 3. Data -->
   <section id="slide-data">
     <div class="kicker">Dataset</div>
-    <h2>4 games, ~16,000 reviews, pulled live from Steam's API</h2>
+    <h2>6 genres, 8,000 recent reviews each, pulled live from Steam's API</h2>
     <table>
-      <tr><th>Game</th><th>Baseline</th><th>Bomb-window</th><th>Role</th></tr>
-      <tr><td><div class="game-cell"><img class="game-thumb" src="assets/helldivers2_header.png" alt="">Helldivers 2</div></td><td>3,988</td><td>—</td><td>Baseline comparison</td></tr>
-      <tr><td><div class="game-cell"><img class="game-thumb" src="assets/warthunder_header.png" alt="">War Thunder</div></td><td>3,929</td><td>—</td><td>Baseline comparison</td></tr>
-      <tr><td><div class="game-cell"><img class="game-thumb" src="assets/tf2_header.png" alt="">Team Fortress 2</div></td><td>3,916</td><td>—</td><td>Baseline comparison</td></tr>
-      <tr><td><div class="game-cell"><img class="game-thumb" src="assets/sts2_header.png" alt="">Slay the Spire 2</div></td><td>2,476</td><td>1,485</td><td><strong>Bomb case study</strong></td></tr>
+      <tr><th>Game</th><th>Genre</th><th>Reviews</th></tr>
+      <tr><td><div class="game-cell"><img class="game-thumb" src="assets/helldivers2_header.png" alt="">Helldivers 2</div></td><td>Co-op shooter</td><td>8,000</td></tr>
+      <tr><td><div class="game-cell"><img class="game-thumb" src="assets/tf2_header.png" alt="">Team Fortress 2</div></td><td>Multiplayer FPS</td><td>8,000</td></tr>
+      <tr><td><div class="game-cell"><img class="game-thumb" src="assets/sts2_header.png" alt="">Slay the Spire 2</div></td><td>Deck-building roguelike</td><td>8,000</td></tr>
+      <tr><td><div class="game-cell"><img class="game-thumb" src="assets/forza_horizon5_header.png" alt="">Forza Horizon 5</div></td><td>Racing</td><td>8,000</td></tr>
+      <tr><td><div class="game-cell"><img class="game-thumb" src="assets/re_requiem_header.png" alt="">Resident Evil Requiem</div></td><td>Survival horror</td><td>8,000</td></tr>
+      <tr><td><div class="game-cell"><img class="game-thumb" src="assets/tekken8_header.png" alt="">Tekken 8</div></td><td>Fighting</td><td>8,000</td></tr>
     </table>
     <p class="muted" style="margin-top:1.5rem; max-width:800px;">
-      Scoped to <strong>English-language reviews only</strong> — a human has to be able to verify a sentiment call to defend it. Steam's own <code>language</code> tag turned out to be reviewer-selected, not content-checked, so a second content-based filter dropped a further 206 mistagged reviews.
+      Scoped to <strong>English-language reviews only</strong> — a human has to be able to verify a sentiment call to defend it. Steam's own <code>language</code> tag is reviewer-selected, not content-checked, so a second content-based filter drops any review containing non-Latin script.
     </p>
-    <footer class="slide-footer">Source: Steam's public appreviews API, <code>filter_offtopic_activity=0</code> so bomb-window reviews aren't silently hidden.</footer>
+    <footer class="slide-footer">Source: Steam's public appreviews API. Six genuinely different genres, chosen to test whether the models generalise, not just fit four similar games.</footer>
   </section>
 
   <!-- 4. EDA -->
@@ -170,8 +174,8 @@
         <p class="muted" style="font-size:0.9rem;">A real spike near zero — a meaningful share of reviews are just a handful of characters.</p>
       </div>
       <div>
-        <img class="chart" src="assets/bomb_volume_chart.png" alt="Daily review volume, bomb window vs baseline">
-        <p class="muted" style="font-size:0.9rem;">Slay the Spire 2's daily volume, cleanly separated into bomb-window vs. baseline slices.</p>
+        <img class="chart" src="assets/sentiment_by_game.png" alt="Raw sentiment per game">
+        <p class="muted" style="font-size:0.9rem;">Tekken 8 stands out as the only game under 60% positive — a real, ongoing monetisation backlash, not a data issue.</p>
       </div>
     </div>
   </section>
@@ -179,30 +183,28 @@
   <!-- 5. Feature engineering -->
   <section id="slide-features">
     <div class="kicker">Feature Engineering</div>
-    <h2>Five features, each with a business reason to exist</h2>
+    <h2>A game-agnostic definition of "low-effort," with no labelled data</h2>
     <table>
       <tr><th>Feature</th><th>Why it matters</th></tr>
-      <tr><td><code>is_very_short</code></td><td>Near-zero-effort reviews say little about the game.</td></tr>
+      <tr><td><code>is_very_short</code></td><td>Near-zero-effort reviews (under 20 characters) say little about the game.</td></tr>
       <tr><td><code>is_low_playtime</code></td><td>A strong opinion after minutes ≠ after real engagement.</td></tr>
-      <tr><td><code>is_duplicate_text</code></td><td>Coordinated campaigns reuse the same slogan.</td></tr>
-      <tr><td><code>daily_volume_zscore</code></td><td>The core bomb signal — is today abnormal?</td></tr>
-      <tr><td><code>is_new_reviewer</code></td><td>Pile-on accounts often have no history.</td></tr>
+      <tr><td><code>is_duplicate_text</code></td><td>Copy-pasted/templated text is a hallmark of low-effort posting.</td></tr>
+      <tr><td><code>is_new_reviewer</code></td><td>Accounts with 0-1 lifetime reviews skew toward throwaway posts.</td></tr>
     </table>
-    <p class="muted" style="margin-top:1rem;">Leakage-safe by design: "what's normal" is always fit on the training split only.</p>
+    <p class="muted" style="margin-top:1rem; max-width:800px;">These four structural signals define a composite "low-effort" label — OR'd together, purely game-agnostic. That label is used only to <em>train</em> the quality filter below; the deployed model predicts it from review text alone, so it works even where no metadata is available.</p>
   </section>
 
   <!-- 6. Model 1 -->
   <section id="slide-model1">
-    <div class="kicker">Model 1 — Quality / Review-Bomb Detection</div>
-    <h2>Three algorithms, one honest iteration story</h2>
+    <div class="kicker">Model 1 — Language-Based Quality Filter</div>
+    <h2>Predicting "low-effort" from text alone</h2>
     <table>
       <tr><th>Model</th><th>Precision</th><th>Recall</th><th>F1</th><th>ROC-AUC</th></tr>
-      <tr><td>Isolation Forest (unsupervised)</td><td>0.042</td><td>0.040</td><td>0.041</td><td>0.361</td></tr>
-      <tr><td>Logistic Regression, structural only</td><td>0.154</td><td>0.793</td><td>0.258</td><td>0.683</td></tr>
-      <tr><td><strong>Logistic Regression, structural + text (TF-IDF)</strong></td><td><strong>0.282</strong></td><td>0.697</td><td><strong>0.402</strong></td><td><strong>0.847</strong></td></tr>
+      <tr><td><strong>TF-IDF + Logistic Regression</strong></td><td><strong>0.821</strong></td><td>0.934</td><td><strong>0.874</strong></td><td><strong>0.960</strong></td></tr>
+      <tr><td>TF-IDF + Random Forest</td><td>0.716</td><td>0.972</td><td>0.825</td><td>0.952</td></tr>
     </table>
     <p class="lead" style="font-size:1.05rem; margin-top:1.5rem;">
-      Adding review text nearly doubled precision. Top "bomb-like" words: <code>anita</code>, <code>dei</code>, <code>sarkeesian</code>, <code>woke</code> — the model is keying on the actual controversy, not noise.
+      Precision 0.77-0.87 and recall 0.92-0.95, consistent across all six genres — including four the model wasn't specifically tuned toward. Top low-effort terms: <code>good</code>, <code>gud</code>, and genre-specific memes (<code>for democracy</code>, <code>pootis</code>) — generic writing patterns, not one controversy's vocabulary.
     </p>
   </section>
 
@@ -212,30 +214,32 @@
     <h2>Classical ML vs. deep learning — closer than you'd think</h2>
     <table>
       <tr><th>Model</th><th>Precision</th><th>Recall</th><th>F1</th><th>ROC-AUC</th></tr>
-      <tr><td>LSTM (deep learning)</td><td>0.922</td><td>0.904</td><td>0.913</td><td>0.899</td></tr>
-      <tr><td>TF-IDF + Logistic Regression (classical ML)</td><td>0.942</td><td>0.877</td><td>0.908</td><td>0.928</td></tr>
+      <tr><td><strong>TF-IDF + Logistic Regression</strong></td><td><strong>0.963</strong></td><td>0.894</td><td><strong>0.927</strong></td><td><strong>0.941</strong></td></tr>
+      <tr><td>LSTM (deep learning)</td><td>0.960</td><td>0.884</td><td>0.920</td><td>0.924</td></tr>
     </table>
     <p class="lead" style="font-size:1.05rem; margin-top:1.5rem;">
-      Deep learning's extra capacity isn't paying off much at this data volume (~11k training rows) — a real, honest finding, and the reason the live app uses the simpler model.
+      Deep learning's extra capacity isn't paying off at ~33,000 training rows — a real, honest finding, and the reason the live app uses the simpler, lighter model (no TensorFlow dependency to deploy).
     </p>
   </section>
 
   <!-- 8. Aggregate scoring result -->
   <section id="slide-result">
     <div class="kicker">Result</div>
-    <h2>The headline number: filtering changes the score</h2>
+    <h2>Filtering junk lowers every score — it doesn't clean it up</h2>
     <div class="grid2">
       <table>
         <tr><th>Game</th><th>Before</th><th>After</th></tr>
-        <tr><td><div class="game-cell"><img class="game-thumb" src="assets/helldivers2_header.png" alt="">Helldivers 2</div></td><td>79.4%</td><td>78.6%</td></tr>
-        <tr><td><div class="game-cell"><img class="game-thumb" src="assets/warthunder_header.png" alt="">War Thunder</div></td><td>52.1%</td><td>49.5%</td></tr>
-        <tr><td><div class="game-cell"><img class="game-thumb" src="assets/tf2_header.png" alt="">Team Fortress 2</div></td><td>93.9%</td><td>93.7%</td></tr>
-        <tr><td><div class="game-cell"><img class="game-thumb" src="assets/sts2_header.png" alt=""><strong>Slay the Spire 2</strong></div></td><td><strong>85.0%</strong></td><td><strong>89.7%</strong></td></tr>
+        <tr><td><div class="game-cell"><img class="game-thumb" src="assets/re_requiem_header.png" alt="">Resident Evil Requiem</div></td><td>94.9%</td><td>93.1%</td></tr>
+        <tr><td><div class="game-cell"><img class="game-thumb" src="assets/tf2_header.png" alt="">Team Fortress 2</div></td><td>94.4%</td><td>91.4%</td></tr>
+        <tr><td><div class="game-cell"><img class="game-thumb" src="assets/sts2_header.png" alt="">Slay the Spire 2</div></td><td>89.0%</td><td>85.4%</td></tr>
+        <tr><td><div class="game-cell"><img class="game-thumb" src="assets/forza_horizon5_header.png" alt="">Forza Horizon 5</div></td><td>87.9%</td><td>78.2%</td></tr>
+        <tr><td><div class="game-cell"><img class="game-thumb" src="assets/helldivers2_header.png" alt=""><strong>Helldivers 2</strong></div></td><td><strong>72.0%</strong></td><td><strong>61.3%</strong></td></tr>
+        <tr><td><div class="game-cell"><img class="game-thumb" src="assets/tekken8_header.png" alt="">Tekken 8</div></td><td>57.7%</td><td>48.5%</td></tr>
       </table>
       <div class="card">
-        <div class="stat-label">Steam's live all-time score, Slay the Spire 2:</div>
-        <div class="stat">60.4% <span class="badge mixed">Mixed</span></div>
-        <p class="muted" style="margin-top:1rem; font-size:0.95rem;">Our sample is a ~2-week, English-only window — this recovers <em>English-speaking-reviewer</em> sentiment for that window, not Steam's full all-time score. Stated plainly, not hidden.</p>
+        <div class="stat-label">Sentiment model vs. Steam's real vote, agreement rate:</div>
+        <div class="stat">83–94%</div>
+        <p class="muted" style="margin-top:1rem; font-size:0.95rem;">Every game's score drops after filtering — low-effort reviews skew more positive than substantive ones. Helldivers 2 crosses a full Steam category, "Mostly Positive" → "Mixed."</p>
       </div>
     </div>
   </section>
@@ -249,7 +253,9 @@
     </div>
     <p class="muted" style="margin-top:1rem;">
       Running locally at <code>localhost:8501</code> — start it before presenting with <code>streamlit run app.py</code>.
-      If the frame above is blank, the app isn't running yet, or open it directly in a new tab as a fallback.
+      If the frame above is blank, the local server isn't running — fall back to the public deployment:
+      <a href="https://steam-review-filter-and-score.streamlit.app/" target="_blank" style="color:var(--accent);">steam-review-filter-and-score.streamlit.app</a>
+      (may take 30–60s to wake up if it's been idle).
     </p>
   </section>
 
@@ -259,14 +265,14 @@
     <h2>What this proves, and what's next</h2>
     <div class="grid2">
       <div>
-        <p class="lead" style="font-size:1.1rem;">Supervised beats unsupervised for bomb detection (ROC-AUC 0.847 vs. 0.361). Adding review text recovered the accuracy lost to an English-only scope — without anything unverifiable.</p>
+        <p class="lead" style="font-size:1.1rem;">A language-only model can both predict sentiment (ROC-AUC 0.94, 83-94% agreement with Steam's real vote) and filter low-effort reviews (ROC-AUC 0.96) consistently across six genuinely different genres — without needing any per-game metadata or timing signal.</p>
       </div>
       <div class="card">
         <ul class="bullets" style="font-size:1rem;">
-          <li>A second bomb case study to confirm the pattern generalises</li>
+          <li>Validate against an even broader genre spread</li>
           <li>Per-language models beyond English</li>
-          <li>Calibrate the threshold to a real precision/recall target</li>
-          <li>Public deployment (Streamlit Community Cloud)</li>
+          <li>Calibrate the flagging threshold to a real precision/recall target</li>
+          <li>Caching and rate-limit handling for high-traffic games</li>
         </ul>
       </div>
     </div>

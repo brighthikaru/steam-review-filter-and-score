@@ -2,37 +2,34 @@
 live_scoring.py
 
 The inference-time pipeline for the demo app: given a Steam appid, pull
-fresh reviews right now, run them through the trained quality filter,
-and report a "before filter" vs "after filter" sentiment score.
+fresh reviews right now, run them through the trained models, and report
+a "before filter" vs "after filter" sentiment score, plus a side-by-side
+comparison between the sentiment model's own prediction and Steam's real
+vote.
 
 WHY this is a separate module from the notebook/training script: the
 notebook and train_models.py answer "does this approach work, and how
-well" using historical, labeled data for 4 specific games. This module
-answers a different question at a different time -- "what does this
-say about a game a user just typed in, right now" -- using only the
-trained artifacts (never re-fitting anything on the fly except the
-one thing that has to be per-game: the temporal baseline, see below).
+well" using historical data. This module answers a different question
+at a different time -- "what does this say about a game a user just
+typed in, right now" -- using only the trained artifacts.
 
-KEY DESIGN DECISION (confirmed with Hikaru, 2026-07-28): the quality
-model's temporal feature needs a "what's a normal day" reference for
-the game in question. That reference only exists, from training, for
-the 4 games in data/raw/. A brand-new game the user searches for has
-no such history in this app. Rather than restrict the app to those 4
-games, we compute the baseline on the fly from the same batch of
-reviews we just pulled (fit_temporal_baseline_from_sample() in
-features.py) -- a realistic compromise for a live product, with a
-documented trade-off: if the entire freshly-pulled sample happens to
-be one long, unbroken bombing event with no quiet days in it, this
-baseline won't "know" that, because there's no true pre-bomb reference
-for an event you're seeing for the first time. That's a real
-limitation, not a hidden one -- see the app's own "how this works"
-panel.
+WHAT changed from the earlier version of this script (2026-07-29): the
+quality filter used to need a per-game temporal baseline (a "what's
+normal daily review volume" reference), computed on the fly for
+new games since only the 4 training games had one from labeled data.
+That whole design is gone now -- the quality filter (see notebook
+Section 5) is trained on review TEXT ALONE, predicting a game-agnostic
+"low-effort" label. It needs nothing but the review text at inference
+time, so there's no per-game baseline to fit, no timing features, and
+no risk of the baseline being wrong for a brand-new game.
 
-WHY no sentiment model is loaded here: Steam's API already returns
-each review's own thumbs up/down (`voted_up`). That's real ground
-truth, not something that needs predicting -- Section 7 of the
-notebook uses it the same way. This app only needs the quality model
-to decide which reviews to trust before averaging `voted_up`.
+This module also now loads a SENTIMENT model (previously skipped,
+since the app relied solely on Steam's own `voted_up` as ground
+truth). The app now shows the sentiment model's own text-based
+prediction side-by-side with Steam's real vote -- per Hikaru's
+request, 2026-07-29 -- both as a demonstration that the model works,
+and because a model that predicts sentiment from text alone is
+portable to any source of review text, not just Steam's API.
 """
 
 import os
@@ -40,24 +37,17 @@ import sys
 
 import joblib
 import pandas as pd
-from scipy.sparse import hstack, csr_matrix
 
 sys.path.append(os.path.dirname(__file__))
-from features import drop_non_english_reviews, build_features_for_inference
+from features import drop_non_english_reviews
 from collect_reviews import pull_reviews, review_to_row
 
 # This module lives in src/, alongside features.py and collect_reviews.py --
 # models/ is the output of train_models.py, one level up at the project root.
 MODELS_DIR = os.path.join(os.path.dirname(__file__), "..", "models")
 
-FEATURE_COLUMNS = [
-    "review_length_chars", "review_length_words", "is_very_short",
-    "playtime_at_review_hours", "is_low_playtime", "is_duplicate_text",
-    "daily_volume_zscore", "is_new_reviewer",
-]
-
 # How many recent reviews to pull for a live lookup. Smaller than the
-# 4,000-per-game training pulls -- this needs to feel responsive in an
+# 8,000-per-game training pulls -- this needs to feel responsive in an
 # app, not exhaustive like the training data collection was.
 LIVE_PULL_TARGET = 400
 
@@ -82,33 +72,42 @@ def to_steam_category(pct_positive):
 
 
 class QualityModel:
-    """Loads the artifacts saved by train_models.py once, so a
-    Streamlit app can reuse the same loaded model across searches
-    instead of re-reading from disk every time."""
+    """Loads the low-effort/junk quality filter saved by train_models.py.
+    Needs nothing but review text -- no structural features, no
+    per-game baseline."""
 
     def __init__(self, models_dir=MODELS_DIR):
-        self.scaler = joblib.load(os.path.join(models_dir, "scaler.joblib"))
-        self.quality_tfidf = joblib.load(os.path.join(models_dir, "quality_tfidf.joblib"))
+        self.vectorizer = joblib.load(os.path.join(models_dir, "quality_tfidf.joblib"))
         self.model = joblib.load(os.path.join(models_dir, "quality_model.joblib"))
-        self.feature_columns = joblib.load(os.path.join(models_dir, "feature_columns.joblib"))
 
-    def predict(self, feat_df):
-        """feat_df must already have the structural feature columns
-        (from build_features_for_inference) and a `review` column."""
-        X_structural = self.scaler.transform(feat_df[self.feature_columns].astype(float))
-        X_text = self.quality_tfidf.transform(feat_df["review"].fillna(""))
-        X_combined = hstack([csr_matrix(X_structural), X_text])
-        return self.model.predict(X_combined), self.model.predict_proba(X_combined)[:, 1]
+    def predict(self, review_text):
+        X = self.vectorizer.transform(review_text.fillna(""))
+        return self.model.predict(X), self.model.predict_proba(X)[:, 1]
+
+
+class SentimentModel:
+    """Loads the text-based sentiment classifier saved by
+    train_models.py. Predicts positive/negative from review text alone
+    -- independent of Steam's own `voted_up`, so this same model could
+    in principle score reviews from a source that doesn't provide a
+    thumbs-up vote at all."""
+
+    def __init__(self, models_dir=MODELS_DIR):
+        self.vectorizer = joblib.load(os.path.join(models_dir, "sentiment_tfidf.joblib"))
+        self.model = joblib.load(os.path.join(models_dir, "sentiment_model.joblib"))
+
+    def predict(self, review_text):
+        X = self.vectorizer.transform(review_text.fillna(""))
+        return self.model.predict(X), self.model.predict_proba(X)[:, 1]
 
 
 def fetch_reviews_df(appid, game_name, target=LIVE_PULL_TARGET):
     """Pulls up to `target` recent reviews for `appid` via the same
     fetch/pull logic collect_reviews.py uses for training data
-    collection (filter="recent", language="english",
-    filter_offtopic_activity=0 so bomb-window reviews aren't silently
-    hidden), then flattens them into a DataFrame with review_to_row()
-    -- identical row shape to the training CSVs."""
-    raw_reviews = pull_reviews(appid, game_name, target, window=None)
+    collection (filter="recent", language="english"), then flattens
+    them into a DataFrame with review_to_row() -- identical row shape
+    to the training CSVs."""
+    raw_reviews = pull_reviews(appid, game_name, target)
     if not raw_reviews:
         return pd.DataFrame(), 0
     rows = [review_to_row(r, appid, game_name) for r in raw_reviews]
@@ -116,14 +115,18 @@ def fetch_reviews_df(appid, game_name, target=LIVE_PULL_TARGET):
     return df, len(raw_reviews)
 
 
-def score_game(appid, game_name, quality_model, target=LIVE_PULL_TARGET):
+def score_game(appid, game_name, quality_model, sentiment_model, target=LIVE_PULL_TARGET):
     """
-    End-to-end: pull -> clean -> feature-engineer -> filter -> score.
+    End-to-end: pull -> clean -> filter -> score, both models.
 
-    Returns a dict with the before/after percentages, Steam-style
-    categories, how many reviews were pulled/dropped/flagged, and a
-    small sample of flagged reviews for transparency (so a user isn't
-    just told "trust the model" with no way to sanity-check it).
+    Returns a dict with:
+      - the before/after "real sentiment" percentages (Steam's own
+        voted_up, filtered by the quality model) and Steam-style
+        categories,
+      - a side-by-side comparison of the sentiment model's own
+        prediction against Steam's real vote (agreement rate),
+      - how many reviews were pulled/dropped/flagged,
+      - a small sample of flagged reviews for transparency.
     """
     df_raw, n_pulled = fetch_reviews_df(appid, game_name, target=target)
     if n_pulled == 0:
@@ -136,29 +139,35 @@ def score_game(appid, game_name, quality_model, target=LIVE_PULL_TARGET):
         return {"error": f"Only {len(df)} usable English-language reviews found -- "
                           f"too few for a reliable score. Try a more-reviewed game."}
 
-    feat = build_features_for_inference(df)
-    quality_pred, quality_score = quality_model.predict(feat)
-    feat = feat.copy()
-    feat["quality_pred"] = quality_pred
-    feat["quality_score"] = quality_score
+    df = df.copy()
+    quality_pred, quality_score = quality_model.predict(df["review"])
+    df["quality_pred"] = quality_pred
+    df["quality_score"] = quality_score
 
-    pct_before = feat["voted_up"].mean() * 100
-    kept = feat[feat["quality_pred"] == 0]
+    sentiment_pred, sentiment_score = sentiment_model.predict(df["review"])
+    df["predicted_sentiment"] = sentiment_pred
+    df["sentiment_confidence"] = sentiment_score
+
+    pct_before = df["voted_up"].mean() * 100
+    kept = df[df["quality_pred"] == 0]
     pct_after = kept["voted_up"].mean() * 100 if len(kept) else None
 
-    flagged = feat[feat["quality_pred"] == 1].sort_values("quality_score", ascending=False)
+    agreement_pct = (df["predicted_sentiment"] == df["voted_up"].astype(int)).mean() * 100
+
+    flagged = df[df["quality_pred"] == 1].sort_values("quality_score", ascending=False)
 
     return {
         "appid": appid,
         "game_name": game_name,
         "n_pulled": n_pulled,
         "n_dropped_non_english": n_dropped_non_english,
-        "n_scored": len(feat),
-        "n_flagged": int(feat["quality_pred"].sum()),
-        "pct_flagged": round(feat["quality_pred"].mean() * 100, 1),
+        "n_scored": len(df),
+        "n_flagged": int(df["quality_pred"].sum()),
+        "pct_flagged": round(df["quality_pred"].mean() * 100, 1),
         "pct_positive_before": round(pct_before, 1),
         "pct_positive_after": round(pct_after, 1) if pct_after is not None else None,
         "category_before": to_steam_category(pct_before),
         "category_after": to_steam_category(pct_after) if pct_after is not None else None,
+        "sentiment_agreement_pct": round(agreement_pct, 1),
         "sample_flagged_reviews": flagged[["review", "voted_up", "quality_score"]].head(10),
     }
