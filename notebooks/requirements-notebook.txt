@@ -1,0 +1,8 @@
+# Extra dependency needed only for the notebook's Section 6 (LSTM model).
+# Not required by the deployed app (app.py) -- kept separate so the
+# Streamlit Cloud deploy doesn't have to resolve TensorFlow's version
+# constraints, which caused a real deploy failure (2026-07-29).
+#
+# Install with: pip install -r notebooks/requirements-notebook.txt
+# (in addition to the root requirements.txt)
+tensorflow
