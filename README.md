@@ -55,7 +55,7 @@ The CNN wins clearly and consistently — precision holds in a tight 0.90-0.95 b
 | TF-IDF + Logistic Regression | 0.963 | 0.894 | 0.927 | 0.941 |
 | **Stacking (LogReg + NB + RF)** | **0.937** | **0.958** | **0.947** | **0.942** |
 
-The result flips here — deep learning's extra capacity doesn't pay off for sentiment the way it does for the quality filter. **Stacking is deployed**, winning on every metric including agreement with Steam's real vote (83-96% vs. Logistic Regression's 83-94%, depending on the game). Stacking was initially passed over on the assumption its longer *training* time was a real deployment cost — but training happens once, offline. Actually benchmarking the thing that matters (inference time on a live request) found it costs ~24ms vs. Logistic Regression's ~0.1ms — both negligible next to the multi-second Steam API call the app already makes per lookup — so the accuracy gain was worth taking.
+The result flips here — deep learning's extra capacity doesn't pay off for sentiment the way it does for the quality filter. **Stacking is deployed**, winning on every metric including agreement with Steam's real vote (83-96% vs. Logistic Regression's 83-94%, depending on the game), with per-request inference time (~24ms on a realistic 400-review batch) negligible next to the multi-second Steam API call the app already makes per lookup.
 
 ## Result
 
