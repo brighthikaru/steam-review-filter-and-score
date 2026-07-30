@@ -78,11 +78,12 @@ with st.expander("How this works, and what it can't do"):
     st.markdown(
         """
 - Reviews are pulled live from Steam's public API.
-- The **quality filter** is a Logistic Regression trained on review text alone (TF-IDF)
-  to predict a game-agnostic "low-effort" label (very short, low playtime, or duplicate
-  text) -- see the project notebook, Section 5 (ROC-AUC 0.96, consistent across six
-  different game genres in testing). It needs nothing but the text, so it works the
-  same way for any game, not just ones it was trained on.
+- The **quality filter** is a CNN (convolutional neural network) trained on review text
+  alone to predict a game-agnostic "low-effort" label (very short, low playtime, or
+  duplicate text) -- see the project notebook, Section 5 (ROC-AUC 0.986, consistent
+  across six different game genres in testing -- it beat every classical ML model tried).
+  It needs nothing but the text, so it works the same way for any game, not just ones
+  it was trained on.
 - The **sentiment model** (Section 6) predicts positive/negative from text alone,
   independent of Steam's own vote -- shown here side-by-side with Steam's real vote
   as a built-in accuracy check (they agree 83-94% of the time across the games tested).

@@ -37,6 +37,7 @@ import sys
 
 import joblib
 import pandas as pd
+from tensorflow import keras
 
 sys.path.append(os.path.dirname(__file__))
 from features import drop_non_english_reviews
@@ -72,17 +73,20 @@ def to_steam_category(pct_positive):
 
 
 class QualityModel:
-    """Loads the low-effort/junk quality filter saved by train_models.py.
-    Needs nothing but review text -- no structural features, no
-    per-game baseline."""
+    """Loads the CNN low-effort/junk quality filter saved by
+    train_models.py. Needs nothing but review text -- the
+    TextVectorization vocabulary is baked into the saved Keras model,
+    so there's no separate vectorizer artifact to load (unlike the
+    earlier TF-IDF + Logistic Regression version)."""
 
     def __init__(self, models_dir=MODELS_DIR):
-        self.vectorizer = joblib.load(os.path.join(models_dir, "quality_tfidf.joblib"))
-        self.model = joblib.load(os.path.join(models_dir, "quality_model.joblib"))
+        self.model = keras.models.load_model(os.path.join(models_dir, "quality_cnn.keras"))
 
     def predict(self, review_text):
-        X = self.vectorizer.transform(review_text.fillna(""))
-        return self.model.predict(X), self.model.predict_proba(X)[:, 1]
+        text_values = review_text.fillna("").values
+        score = self.model.predict(text_values, verbose=0).flatten()
+        pred = (score >= 0.5).astype(int)
+        return pred, score
 
 
 class SentimentModel:

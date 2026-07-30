@@ -20,16 +20,21 @@ That approach was dropped -- see the notebook's Section 5.7 for why
 (it didn't generalise to games outside its training set). The quality
 filter here is now trained on review TEXT ALONE, predicting a
 game-agnostic "low-effort" proxy label (very-short OR low-playtime OR
-duplicate-text) -- see notebook Section 4.2/5. This also means the app
-no longer needs a StandardScaler or structural feature columns at
-inference time: the quality model only needs the review's text.
+duplicate-text) -- see notebook Section 4.2/5.
 
-This script also now trains and saves the SENTIMENT model (TF-IDF +
-Logistic Regression, notebook Section 6), which the earlier version
-deliberately skipped since the app used to rely solely on Steam's own
-`voted_up` field as ground truth. The app now shows the sentiment
-model's own prediction side-by-side with Steam's real vote (per
-Hikaru's request, 2026-07-29), so both models need to ship together.
+WHAT changed again (2026-07-30): the quality filter is now a CNN
+(Keras/TensorFlow), not TF-IDF + Logistic Regression. A comparison in
+the notebook (Section 5) found a CNN substantially outperforms every
+classical model tried (ROC-AUC 0.986 vs. 0.962 for the best classical
+candidate), consistent across all six game genres -- a real, checked
+result, not just a higher headline number. The CNN's TextVectorization
+layer is trained as part of the model itself, so there's no separate
+TF-IDF vectorizer artifact to save for the quality filter anymore --
+just one Keras model that takes raw review text directly.
+
+The sentiment model stays TF-IDF + Logistic Regression (Section 6) --
+classical ML still wins there; deep learning's extra capacity doesn't
+pay off for sentiment at this data volume.
 
 USAGE:
     python train_models.py
@@ -40,11 +45,16 @@ import glob
 import os
 
 import joblib
+import numpy as np
 import pandas as pd
+import tensorflow as tf
+from tensorflow import keras
+from tensorflow.keras import layers
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import precision_score, recall_score, f1_score, roc_auc_score
 from sklearn.model_selection import train_test_split
+from sklearn.utils.class_weight import compute_class_weight
 
 from features import (
     drop_non_english_reviews,
@@ -53,6 +63,9 @@ from features import (
     add_author_features,
     _normalize_text,
 )
+
+VOCAB_SIZE = 8000
+SEQ_LEN = 60
 
 # This script lives in src/, alongside features.py and collect_reviews.py --
 # data/ and the models/ output directory are both one level up, at the
@@ -93,27 +106,57 @@ def add_low_effort_label(df):
 
 
 def train_quality_model(df):
-    print("\n--- Quality (low-effort review) filter ---")
+    """
+    Trains the CNN quality filter (notebook Section 5): a Keras
+    Sequential model whose first layer is a TextVectorization layer, so
+    the fitted vocabulary is saved as part of the model itself -- no
+    separate vectorizer artifact needed. Takes raw review text strings
+    directly as input.
+    """
+    print("\n--- Quality (low-effort review) filter: CNN ---")
     quality_df = add_low_effort_label(df)
 
     strat_key = quality_df["game_name"] + "_" + quality_df["label"].astype(str)
     train_df, test_df = train_test_split(quality_df, test_size=0.3, random_state=42, stratify=strat_key)
 
-    vectorizer = TfidfVectorizer(max_features=3000, ngram_range=(1, 2), min_df=3)
-    X_train = vectorizer.fit_transform(train_df["review"].fillna(""))
-    X_test = vectorizer.transform(test_df["review"].fillna(""))
-    y_train = train_df["label"]
-    y_test = test_df["label"]
+    train_text = train_df["review"].fillna("").values
+    test_text = test_df["review"].fillna("").values
+    y_train = train_df["label"].values
+    y_test = test_df["label"].values
 
-    model = LogisticRegression(class_weight="balanced", max_iter=1000, random_state=42)
-    model.fit(X_train, y_train)
+    tf.random.set_seed(42)
+    text_vectorizer = layers.TextVectorization(max_tokens=VOCAB_SIZE, output_sequence_length=SEQ_LEN)
+    text_vectorizer.adapt(train_text)
 
-    pred = model.predict(X_test)
-    score = model.predict_proba(X_test)[:, 1]
+    model = keras.Sequential([
+        keras.Input(shape=(1,), dtype=tf.string),
+        text_vectorizer,
+        layers.Embedding(input_dim=VOCAB_SIZE, output_dim=64, mask_zero=False),
+        layers.Conv1D(64, 5, activation="relu"),
+        layers.GlobalMaxPooling1D(),
+        layers.Dense(32, activation="relu"),
+        layers.Dropout(0.3),
+        layers.Dense(1, activation="sigmoid"),
+    ])
+    model.compile(optimizer="adam", loss="binary_crossentropy", metrics=["accuracy"])
+
+    classes = np.unique(y_train)
+    weights = compute_class_weight(class_weight="balanced", classes=classes, y=y_train)
+    class_weight = dict(zip(classes, weights))
+    early_stop = keras.callbacks.EarlyStopping(monitor="val_loss", patience=1, restore_best_weights=True)
+
+    model.fit(
+        train_text, y_train,
+        validation_split=0.1, epochs=10, batch_size=128,
+        class_weight=class_weight, callbacks=[early_stop], verbose=2,
+    )
+
+    score = model.predict(test_text, verbose=0).flatten()
+    pred = (score >= 0.5).astype(int)
     print(f"  test precision={precision_score(y_test, pred):.3f} recall={recall_score(y_test, pred):.3f} "
           f"f1={f1_score(y_test, pred):.3f} roc_auc={roc_auc_score(y_test, score):.3f}")
 
-    return vectorizer, model
+    return model
 
 
 def train_sentiment_model(df):
@@ -150,12 +193,14 @@ def train():
     df, dropped = drop_non_english_reviews(df_raw)
     print(f"  dropped {len(dropped)} of {len(df_raw)} rows")
 
-    quality_vectorizer, quality_model = train_quality_model(df)
+    quality_model = train_quality_model(df)
     sentiment_vectorizer, sentiment_model = train_sentiment_model(df)
 
     os.makedirs(MODELS_DIR, exist_ok=True)
-    joblib.dump(quality_vectorizer, os.path.join(MODELS_DIR, "quality_tfidf.joblib"))
-    joblib.dump(quality_model, os.path.join(MODELS_DIR, "quality_model.joblib"))
+    # Keras' own format -- a single .keras file, vocabulary and weights
+    # both included. No separate vectorizer artifact for the quality
+    # model anymore (see train_quality_model's docstring).
+    quality_model.save(os.path.join(MODELS_DIR, "quality_cnn.keras"))
     joblib.dump(sentiment_vectorizer, os.path.join(MODELS_DIR, "sentiment_tfidf.joblib"))
     joblib.dump(sentiment_model, os.path.join(MODELS_DIR, "sentiment_model.joblib"))
     print(f"\nSaved artifacts to {MODELS_DIR}")
