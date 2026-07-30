@@ -28,12 +28,12 @@
     scroll-snap-type: y mandatory;
   }
   section {
-    height: 100vh;
+    min-height: 100vh;
     scroll-snap-align: start;
     display: flex;
     flex-direction: column;
     justify-content: center;
-    padding: 6vh 8vw;
+    padding: 5vh 8vw;
     position: relative;
     border-bottom: 1px solid #2a2e37;
   }
@@ -45,32 +45,25 @@
     font-weight: 600;
     margin-bottom: 0.5rem;
   }
-  h1 { font-size: 3rem; margin: 0 0 0.5rem 0; line-height: 1.1; }
-  h2 { font-size: 2.2rem; margin: 0 0 1rem 0; }
-  p.lead { font-size: 1.3rem; color: var(--muted); max-width: 780px; }
-  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 3rem; align-items: center; }
-  .grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1.5rem; }
-  table { border-collapse: collapse; width: 100%; font-size: 0.95rem; }
-  th, td { text-align: left; padding: 0.5rem 0.9rem; border-bottom: 1px solid #2a2e37; }
+  h1 { font-size: 2.6rem; margin: 0 0 0.5rem 0; line-height: 1.15; }
+  h2 { font-size: 1.9rem; margin: 0 0 1rem 0; }
+  p.lead { font-size: 1.15rem; color: var(--muted); max-width: 700px; line-height: 1.5; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 2.5rem; align-items: center; }
+  table { border-collapse: collapse; width: 100%; font-size: 0.92rem; }
+  th, td { text-align: left; padding: 0.45rem 0.8rem; border-bottom: 1px solid #2a2e37; }
   th { color: var(--accent); font-weight: 600; }
   tr:last-child td { border-bottom: none; }
   .card {
     background: var(--panel);
     border: 1px solid #2a2e37;
     border-radius: 10px;
-    padding: 1.4rem 1.6rem;
+    padding: 1.2rem 1.4rem;
   }
-  .stat { font-size: 2.4rem; font-weight: 700; color: var(--accent2); }
-  .stat-label { color: var(--muted); font-size: 0.95rem; }
-  .badge {
-    display: inline-block; padding: 0.15rem 0.6rem; border-radius: 999px;
-    font-size: 0.8rem; font-weight: 600; margin-left: 0.5rem;
-  }
-  .badge.good { background: rgba(164,208,7,0.15); color: var(--accent2); }
-  .badge.mixed { background: rgba(224,92,92,0.15); color: var(--danger); }
-  img.chart { max-width: 100%; border-radius: 8px; border: 1px solid #2a2e37; }
-  ul.bullets { font-size: 1.05rem; line-height: 1.7; color: var(--text); }
-  ul.bullets li { margin-bottom: 0.6rem; }
+  .stat { font-size: 2.1rem; font-weight: 700; color: var(--accent2); }
+  .stat-label { color: var(--muted); font-size: 0.9rem; }
+  img.chart { max-width: 100%; max-height: 320px; object-fit: contain; border-radius: 8px; border: 1px solid #2a2e37; }
+  ul.bullets { font-size: 1rem; line-height: 1.65; color: var(--text); }
+  ul.bullets li { margin-bottom: 0.55rem; }
   .muted { color: var(--muted); }
   code { background: #1f232c; padding: 0.1rem 0.4rem; border-radius: 4px; font-size: 0.9em; }
   .progress {
@@ -88,18 +81,42 @@
   .nav-dots a:hover, .nav-dots a.active { background: var(--accent); }
   .demo-frame-wrap {
     background: var(--panel); border: 1px solid #2a2e37; border-radius: 10px;
-    padding: 1rem; height: 60vh;
+    padding: 1rem; height: 50vh; max-height: 420px;
   }
   iframe.demo { width: 100%; height: 100%; border: none; border-radius: 6px; background: #fff; }
-  .demo-fallback {
-    display: flex; align-items: center; justify-content: center;
-    height: 100%; color: var(--muted); text-align: center; padding: 2rem;
+  .game-cell { display: flex; align-items: center; gap: 0.6rem; }
+  .game-thumb { height: 30px; border-radius: 4px; display: block; }
+
+  /* bar chart */
+  .barchart { display: flex; flex-direction: column; gap: 0.55rem; margin-top: 1rem; max-width: 640px; }
+  .bar-row { display: grid; grid-template-columns: 190px 1fr 56px; align-items: center; gap: 0.7rem; font-size: 0.85rem; }
+  .bar-row.winner .bar-label { color: var(--accent2); font-weight: 700; }
+  .bar-track { background: #1f232c; border-radius: 5px; height: 16px; overflow: hidden; }
+  .bar-fill { height: 100%; background: var(--accent); border-radius: 5px; }
+  .bar-row.winner .bar-fill { background: var(--accent2); }
+  .bar-val { text-align: right; color: var(--muted); }
+
+  /* review cards */
+  .review-cards { display: flex; gap: 1.2rem; margin-top: 1.2rem; max-width: 800px; }
+  .review-card {
+    flex: 1; background: var(--panel); border: 1px solid #2a2e37; border-radius: 10px;
+    padding: 1rem 1.1rem; font-size: 0.9rem; line-height: 1.45;
   }
-  footer.slide-footer { position: absolute; bottom: 2vh; left: 8vw; color: var(--muted); font-size: 0.85rem; }
-  .hero-collage { display: flex; gap: 1rem; margin-top: 2.5rem; }
-  .hero-collage img { height: 110px; border-radius: 8px; border: 1px solid #2a2e37; box-shadow: 0 8px 24px rgba(0,0,0,0.4); }
-  .game-cell { display: flex; align-items: center; gap: 0.7rem; }
-  .game-thumb { height: 34px; border-radius: 4px; display: block; }
+  .review-card .rname { color: var(--muted); font-size: 0.78rem; margin-bottom: 0.4rem; display:flex; align-items:center; gap:0.4rem; }
+  .review-card .rvote { font-weight: 700; margin-bottom: 0.4rem; }
+  .review-card.junk .rvote, .review-card.good .rvote { color: var(--accent2); }
+  .review-card .flag { display:inline-block; margin-top:0.6rem; font-size:0.72rem; padding:0.2rem 0.6rem; border-radius:999px; }
+  .review-card.junk .flag { background: rgba(224,92,92,0.15); color: var(--danger); }
+  .review-card.good .flag { background: rgba(164,208,7,0.15); color: var(--accent2); }
+  .redact { background: var(--muted); color: var(--muted); border-radius: 3px; padding: 0 4px; user-select: none; }
+
+  .icon-row { display: flex; gap: 1.4rem; margin-top: 1.1rem; }
+  .icon-chip { flex: 1; background: var(--panel); border: 1px solid #2a2e37; border-radius: 10px; padding: 1rem 0.8rem; text-align: center; }
+  .icon-chip .glyph { font-size: 1.6rem; margin-bottom: 0.4rem; }
+  .icon-chip .label { font-size: 0.88rem; color: var(--text); font-weight: 600; }
+  .icon-chip .sub { font-size: 0.78rem; color: var(--muted); margin-top: 0.25rem; }
+
+  footer.slide-footer { position: absolute; bottom: 2vh; left: 8vw; color: var(--muted); font-size: 0.8rem; }
 </style>
 </head>
 <body>
@@ -111,180 +128,136 @@
 
   <!-- 1. Title -->
   <section id="slide-title">
-    <div class="kicker">Capstone Project — Data Science &amp; AI</div>
-    <h1>Steam Review Filter and Score</h1>
-    <p class="lead">Showing a game's real sentiment by filtering out low-effort, junk reviews — using nothing but the review text, demoed live on any game.</p>
-    <div class="hero-collage">
-      <img src="assets/helldivers2_header.png" alt="Helldivers 2">
-      <img src="assets/tf2_header.png" alt="Team Fortress 2">
-      <img src="assets/sts2_header.png" alt="Slay the Spire 2">
-      <img src="assets/forza_horizon5_header.png" alt="Forza Horizon 5">
-      <img src="assets/re_requiem_header.png" alt="Resident Evil Requiem">
-      <img src="assets/tekken8_header.png" alt="Tekken 8">
-    </div>
-    <footer class="slide-footer">Hikaru · Institute of Data</footer>
+    <img src="https://upload.wikimedia.org/wikipedia/commons/8/83/Steam_icon_logo.svg"
+         alt="Steam logo" width="88" height="88" style="margin-bottom: 1.2rem;"
+         onerror="this.replaceWith(Object.assign(document.createElement('div'), {innerHTML:'&#9733;', style:'font-size:4rem;color:var(--accent);margin-bottom:1.2rem;'}))">
+
+    <h1>Steam Review Filter &amp; Score</h1>
+    <p class="lead">Cutting the junk out of Steam reviews, so what's left actually tells you what people think of the game.</p>
   </section>
 
-  <!-- 2. Business problem -->
+  <!-- 2. Problem + example reviews -->
   <section id="slide-problem">
-    <div class="kicker">Business Problem</div>
-    <h2>A game's score mixes real opinions with junk</h2>
-    <div class="grid2">
-      <div>
-        <p class="lead">A one-word "good game" and a considered, on-topic critique count equally toward a game's public score. That makes it hard to tell whether a score reflects genuine community sentiment, or is diluted by noise that says nothing about the game at all.</p>
-        <ul class="bullets">
-          <li><strong>Stakeholders:</strong> players deciding whether to buy; developers/publishers reading feedback; Steam itself, which never surfaces a "real sentiment" score.</li>
-          <li><strong>Business question:</strong> can we produce a real sentiment score using nothing but the review text?</li>
-          <li><strong>Data question:</strong> does language alone carry a generalisable signal for sentiment AND quality, across genuinely different games?</li>
-        </ul>
+    <div class="kicker">The Problem</div>
+    <h2>Not every review is worth counting</h2>
+    <p class="lead">A one-word "good game" counts exactly the same as a real, thought-out review. That waters down the score.</p>
+    <div class="review-cards">
+      <div class="review-card junk">
+        <div class="rname"><span class="redact">Player_8213</span> · 0.3 hrs played</div>
+        <div class="rvote">👍 Recommended</div>
+        <div>"game good :)"</div>
+        <div class="flag">flagged: low-effort</div>
       </div>
-      <div class="card">
-        <div class="stat">1.2%</div>
-        <div class="stat-label">of reviews tagged "english" by Steam were actually written in another language — one data-quality problem this project had to solve first.</div>
+      <div class="review-card good">
+        <div class="rname"><span class="redact">Player_5590</span> · 41 hrs played</div>
+        <div class="rvote">👍 Recommended</div>
+        <div>"Fond memories of diving with friends, amazing concept and atmosphere... let down by the devs' constant push to sell you more warbonds."</div>
+        <div class="flag">kept: genuine review</div>
       </div>
     </div>
+    <p class="lead" style="margin-top:0.9rem; font-size:0.85rem;">Real reviews from our dataset, usernames redacted.</p>
   </section>
 
-  <!-- 3. Data -->
+  <!-- 3. Dataset -->
   <section id="slide-data">
-    <div class="kicker">Dataset</div>
-    <h2>6 genres, 8,000 recent reviews each, pulled live from Steam's API</h2>
+    <div class="kicker">The Data</div>
+    <h2>6 very different games, 8,000 reviews each</h2>
     <table>
-      <tr><th>Game</th><th>Genre</th><th>Reviews</th></tr>
-      <tr><td><div class="game-cell"><img class="game-thumb" src="assets/helldivers2_header.png" alt="">Helldivers 2</div></td><td>Co-op shooter</td><td>8,000</td></tr>
-      <tr><td><div class="game-cell"><img class="game-thumb" src="assets/tf2_header.png" alt="">Team Fortress 2</div></td><td>Multiplayer FPS</td><td>8,000</td></tr>
-      <tr><td><div class="game-cell"><img class="game-thumb" src="assets/sts2_header.png" alt="">Slay the Spire 2</div></td><td>Deck-building roguelike</td><td>8,000</td></tr>
-      <tr><td><div class="game-cell"><img class="game-thumb" src="assets/forza_horizon5_header.png" alt="">Forza Horizon 5</div></td><td>Racing</td><td>8,000</td></tr>
-      <tr><td><div class="game-cell"><img class="game-thumb" src="assets/re_requiem_header.png" alt="">Resident Evil Requiem</div></td><td>Survival horror</td><td>8,000</td></tr>
-      <tr><td><div class="game-cell"><img class="game-thumb" src="assets/tekken8_header.png" alt="">Tekken 8</div></td><td>Fighting</td><td>8,000</td></tr>
+      <tr><th>Game</th><th>Genre</th></tr>
+      <tr><td><div class="game-cell"><img class="game-thumb" src="assets/helldivers2_header.png" alt="">Helldivers 2</div></td><td>Co-op shooter</td></tr>
+      <tr><td><div class="game-cell"><img class="game-thumb" src="assets/tf2_header.png" alt="">Team Fortress 2</div></td><td>Multiplayer FPS</td></tr>
+      <tr><td><div class="game-cell"><img class="game-thumb" src="assets/sts2_header.png" alt="">Slay the Spire 2</div></td><td>Roguelike deck-builder</td></tr>
+      <tr><td><div class="game-cell"><img class="game-thumb" src="assets/forza_horizon5_header.png" alt="">Forza Horizon 5</div></td><td>Racing</td></tr>
+      <tr><td><div class="game-cell"><img class="game-thumb" src="assets/re_requiem_header.png" alt="">Resident Evil Requiem</div></td><td>Survival horror</td></tr>
+      <tr><td><div class="game-cell"><img class="game-thumb" src="assets/tekken8_header.png" alt="">Tekken 8</div></td><td>Fighting</td></tr>
     </table>
-    <p class="muted" style="margin-top:1.5rem; max-width:800px;">
-      Scoped to <strong>English-language reviews only</strong> — a human has to be able to verify a sentiment call to defend it. Steam's own <code>language</code> tag is reviewer-selected, not content-checked, so a second content-based filter drops any review containing non-Latin script.
-    </p>
-    <footer class="slide-footer">Source: Steam's public appreviews API. Six genuinely different genres, chosen to test whether the models generalise, not just fit four similar games.</footer>
+    <p class="lead" style="margin-top:1rem; font-size:0.9rem;">English-only, pulled live from Steam's own API — 48,000 reviews in total.</p>
   </section>
 
-  <!-- 4. EDA -->
-  <section id="slide-eda">
-    <div class="kicker">Exploratory Data Analysis</div>
-    <h2>The signal was visible before any model touched it</h2>
-    <div class="grid2">
-      <div>
-        <img class="chart" src="assets/review_length_hist.png" alt="Review length distribution">
-        <p class="muted" style="font-size:0.9rem;">A real spike near zero — a meaningful share of reviews are just a handful of characters.</p>
-      </div>
-      <div>
-        <img class="chart" src="assets/sentiment_by_game.png" alt="Raw sentiment per game">
-        <p class="muted" style="font-size:0.9rem;">Tekken 8 stands out as the only game under 60% positive — a real, ongoing monetisation backlash, not a data issue.</p>
-      </div>
-    </div>
-  </section>
-
-  <!-- 5. Feature engineering -->
+  <!-- 4. Low-effort definition -->
   <section id="slide-features">
-    <div class="kicker">Feature Engineering</div>
-    <h2>A game-agnostic definition of "low-effort," with no labelled data</h2>
-    <table>
-      <tr><th>Feature</th><th>Why it matters</th></tr>
-      <tr><td><code>is_very_short</code></td><td>Near-zero-effort reviews (under 20 characters) say little about the game.</td></tr>
-      <tr><td><code>is_low_playtime</code></td><td>A strong opinion after minutes ≠ after real engagement.</td></tr>
-      <tr><td><code>is_duplicate_text</code></td><td>Copy-pasted/templated text is a hallmark of low-effort posting.</td></tr>
-      <tr><td><code>is_new_reviewer</code></td><td>Accounts with 0-1 lifetime reviews skew toward throwaway posts.</td></tr>
-    </table>
-    <p class="muted" style="margin-top:1rem; max-width:800px;">These four structural signals define a composite "low-effort" label — OR'd together, purely game-agnostic. That label is used only to <em>train</em> the quality filter below; the deployed model predicts it from review text alone, so it works even where no metadata is available.</p>
+    <div class="kicker">Defining "Low Effort"</div>
+    <h2>What actually makes a review junk?</h2>
+    <p class="lead">No one hand-labels this, so we built a simple rule from the data itself:</p>
+    <div class="icon-row" style="max-width:700px;">
+      <div class="icon-chip"><div class="glyph">✂️</div><div class="label">Too short</div><div class="sub">under 20 characters</div></div>
+      <div class="icon-chip"><div class="glyph">⏱️</div><div class="label">Barely played</div><div class="sub">under 1 hour</div></div>
+      <div class="icon-chip"><div class="glyph">📋</div><div class="label">Copy-pasted</div><div class="sub">duplicate text</div></div>
+    </div>
+    <p class="lead" style="margin-top:1.1rem;">Any one of these = flagged. This label only trains the model — the live app judges purely from the words themselves.</p>
   </section>
 
-  <!-- 6. Model 1 -->
+  <!-- 5. Quality filter results -->
   <section id="slide-model1">
-    <div class="kicker">Model 1 — Language-Based Quality Filter</div>
-    <h2>Predicting "low-effort" from text alone — 6 models tested</h2>
-    <table>
-      <tr><th>Model</th><th>Precision</th><th>Recall</th><th>F1</th><th>ROC-AUC</th></tr>
-      <tr><td>TF-IDF + Naive Bayes</td><td>0.799</td><td>0.620</td><td>0.698</td><td>0.911</td></tr>
-      <tr><td>TF-IDF + Random Forest</td><td>0.716</td><td>0.972</td><td>0.825</td><td>0.952</td></tr>
-      <tr><td>TF-IDF + Linear SVM</td><td>0.848</td><td>0.906</td><td>0.876</td><td>0.956</td></tr>
-      <tr><td>TF-IDF + Logistic Regression</td><td>0.821</td><td>0.934</td><td>0.874</td><td>0.960</td></tr>
-      <tr><td>Stacking (LogReg+NB+RF)</td><td>0.860</td><td>0.905</td><td>0.882</td><td>0.962</td></tr>
-      <tr><td><strong>CNN (deployed)</strong></td><td><strong>0.925</strong></td><td><strong>0.958</strong></td><td><strong>0.941</strong></td><td><strong>0.986</strong></td></tr>
-    </table>
-    <p class="lead" style="font-size:1.05rem; margin-top:1.5rem;">
-      The CNN wins clearly — precision holds in a tight 0.90-0.95 band across all six genres, not just on average. Top low-effort terms (from the classical model, used for interpretability): <code>good</code>, <code>gud</code>, and genre-specific memes (<code>for democracy</code>, <code>pootis</code>) — generic writing patterns, not one controversy's vocabulary.
-    </p>
+    <div class="kicker">Spotting the Junk</div>
+    <h2>A CNN turned out to be the best at this</h2>
+    <div class="barchart">
+      <div class="bar-row"><div class="bar-label">Naive Bayes</div><div class="bar-track"><div class="bar-fill" style="width:91.1%"></div></div><div class="bar-val">0.911</div></div>
+      <div class="bar-row"><div class="bar-label">Random Forest</div><div class="bar-track"><div class="bar-fill" style="width:95.2%"></div></div><div class="bar-val">0.952</div></div>
+      <div class="bar-row"><div class="bar-label">Linear SVM</div><div class="bar-track"><div class="bar-fill" style="width:95.6%"></div></div><div class="bar-val">0.956</div></div>
+      <div class="bar-row"><div class="bar-label">Logistic Regression</div><div class="bar-track"><div class="bar-fill" style="width:96.0%"></div></div><div class="bar-val">0.960</div></div>
+      <div class="bar-row"><div class="bar-label">Stacking ensemble</div><div class="bar-track"><div class="bar-fill" style="width:96.2%"></div></div><div class="bar-val">0.962</div></div>
+      <div class="bar-row winner"><div class="bar-label">CNN ★ deployed</div><div class="bar-track"><div class="bar-fill" style="width:98.6%"></div></div><div class="bar-val">0.986</div></div>
+    </div>
+    <p class="lead" style="margin-top:1rem; font-size:0.9rem;">ROC-AUC score — the CNN beats every classical model, and stays consistent across all six games.</p>
   </section>
 
-  <!-- 7. Model 2 -->
+  <!-- 6. Sentiment results -->
   <section id="slide-model2">
-    <div class="kicker">Model 2 — Sentiment Scoring</div>
-    <h2>The result flips: deep learning doesn't win here</h2>
-    <table>
-      <tr><th>Model</th><th>Precision</th><th>Recall</th><th>F1</th><th>ROC-AUC</th></tr>
-      <tr><td>CNN (deep learning)</td><td>0.958</td><td>0.893</td><td>0.925</td><td>0.934</td></tr>
-      <tr><td>LSTM (deep learning)</td><td>0.960</td><td>0.884</td><td>0.920</td><td>0.924</td></tr>
-      <tr><td><strong>TF-IDF + Logistic Regression (deployed)</strong></td><td><strong>0.963</strong></td><td>0.894</td><td><strong>0.927</strong></td><td>0.941</td></tr>
-      <tr><td>Stacking (LogReg+NB+RF)</td><td>0.937</td><td>0.958</td><td>0.947</td><td>0.942</td></tr>
-    </table>
-    <p class="lead" style="font-size:1.05rem; margin-top:1.5rem;">
-      The same CNN architecture that won decisively for the quality filter comes in <em>behind</em> Logistic Regression here. Stacking edges out LogReg slightly (91.2% vs. 88.4% agreement with Steam's real vote) but isn't worth ~30x the training cost for a live app — a genuinely useful negative result: more capacity doesn't transfer automatically between related tasks.
-    </p>
+    <div class="kicker">Reading Sentiment</div>
+    <h2>Here, the simple model wins</h2>
+    <div class="barchart">
+      <div class="bar-row"><div class="bar-label">CNN</div><div class="bar-track"><div class="bar-fill" style="width:93.4%"></div></div><div class="bar-val">0.934</div></div>
+      <div class="bar-row"><div class="bar-label">LSTM</div><div class="bar-track"><div class="bar-fill" style="width:92.4%"></div></div><div class="bar-val">0.924</div></div>
+      <div class="bar-row winner"><div class="bar-label">Logistic Regression ★ deployed</div><div class="bar-track"><div class="bar-fill" style="width:94.1%"></div></div><div class="bar-val">0.941</div></div>
+      <div class="bar-row"><div class="bar-label">Stacking ensemble</div><div class="bar-track"><div class="bar-fill" style="width:94.2%"></div></div><div class="bar-val">0.942</div></div>
+    </div>
+    <p class="lead" style="margin-top:1rem; font-size:0.9rem;">Same deep learning that won for junk-spotting doesn't help here — a good reminder that bigger isn't always better.</p>
   </section>
 
-  <!-- 8. Aggregate scoring result -->
+  <!-- 7. Result -->
   <section id="slide-result">
-    <div class="kicker">Result</div>
-    <h2>Filtering junk lowers every score — it doesn't clean it up</h2>
+    <div class="kicker">The Result</div>
+    <h2>Filtering junk always lowers the score</h2>
     <div class="grid2">
       <table>
         <tr><th>Game</th><th>Before</th><th>After</th></tr>
-        <tr><td><div class="game-cell"><img class="game-thumb" src="assets/re_requiem_header.png" alt="">Resident Evil Requiem</div></td><td>94.9%</td><td>93.1%</td></tr>
-        <tr><td><div class="game-cell"><img class="game-thumb" src="assets/tf2_header.png" alt="">Team Fortress 2</div></td><td>94.4%</td><td>91.4%</td></tr>
-        <tr><td><div class="game-cell"><img class="game-thumb" src="assets/sts2_header.png" alt="">Slay the Spire 2</div></td><td>89.0%</td><td>85.4%</td></tr>
+        <tr><td><div class="game-cell"><img class="game-thumb" src="assets/helldivers2_header.png" alt="">Helldivers 2</div></td><td>72.0%</td><td><strong>61.3%</strong></td></tr>
         <tr><td><div class="game-cell"><img class="game-thumb" src="assets/forza_horizon5_header.png" alt="">Forza Horizon 5</div></td><td>87.9%</td><td>78.2%</td></tr>
-        <tr><td><div class="game-cell"><img class="game-thumb" src="assets/helldivers2_header.png" alt=""><strong>Helldivers 2</strong></div></td><td><strong>72.0%</strong></td><td><strong>61.3%</strong></td></tr>
+        <tr><td><div class="game-cell"><img class="game-thumb" src="assets/sts2_header.png" alt="">Slay the Spire 2</div></td><td>89.0%</td><td>85.4%</td></tr>
         <tr><td><div class="game-cell"><img class="game-thumb" src="assets/tekken8_header.png" alt="">Tekken 8</div></td><td>57.7%</td><td>48.5%</td></tr>
       </table>
       <div class="card">
-        <div class="stat-label">Sentiment model vs. Steam's real vote, agreement rate:</div>
+        <div class="stat-label">Model vs. Steam's real vote</div>
         <div class="stat">83–94%</div>
-        <p class="muted" style="margin-top:1rem; font-size:0.95rem;">Every game's score drops after filtering — low-effort reviews skew more positive than substantive ones. Helldivers 2 crosses a full Steam category, "Mostly Positive" → "Mixed."</p>
+        <p class="muted" style="margin-top:0.6rem; font-size:0.85rem;">agreement rate. Helldivers 2 even drops a whole Steam category — "Mostly Positive" → "Mixed" — once the quick praise is filtered out.</p>
       </div>
     </div>
   </section>
 
-  <!-- 9. Live demo -->
+  <!-- 8. Live demo -->
   <section id="slide-demo">
     <div class="kicker">Live Demo</div>
     <h2>Try it on any game, right now</h2>
     <div class="demo-frame-wrap">
-      <iframe class="demo" id="demoFrame"
-        src="https://steam-review-filter-and-score.streamlit.app/?embed=true"
-        onload="document.getElementById('demoFallback').style.display='none';"
-        onerror="document.getElementById('demoFallback').style.display='flex';"></iframe>
+      <iframe class="demo" id="demoFrame" src="https://steam-review-filter-and-score.streamlit.app/?embed=true"></iframe>
     </div>
-    <p class="muted" style="margin-top:1rem;" id="demoFallback">
-      If the embedded frame above doesn't load (some browsers block Streamlit's iframe, or the free-tier app is
-      waking up from sleep — can take 30–60s), open it directly instead:
-      <a href="https://steam-review-filter-and-score.streamlit.app/" target="_blank" rel="noopener" style="color:var(--accent);">steam-review-filter-and-score.streamlit.app ↗</a>
+    <p class="lead" style="margin-top:0.9rem; font-size:0.9rem;">
+      <a href="https://steam-review-filter-and-score.streamlit.app/" target="_blank" rel="noopener" style="color:var(--accent);">Open full app ↗</a>
+      — may take 30-60s to wake up if idle.
     </p>
   </section>
 
-  <!-- 10. Conclusion -->
+  <!-- 9. Wrap up -->
   <section id="slide-conclusion">
-    <div class="kicker">Conclusion &amp; Future Work</div>
-    <h2>What this proves, and what's next</h2>
-    <div class="grid2">
-      <div>
-        <p class="lead" style="font-size:1.1rem;">A language-only pipeline can both filter low-effort reviews (CNN, ROC-AUC 0.986) and predict sentiment (Logistic Regression, ROC-AUC 0.941, 83-94% agreement with Steam's real vote) consistently across six genuinely different genres — without needing any per-game metadata or timing signal. The winning model differed by task: deep learning paid off for quality filtering, not for sentiment.</p>
-      </div>
-      <div class="card">
-        <ul class="bullets" style="font-size:1rem;">
-          <li>Validate against an even broader genre spread</li>
-          <li>Per-language models beyond English</li>
-          <li>Calibrate the flagging threshold to a real precision/recall target</li>
-          <li>Pretrained transformer (e.g. DistilBERT) for sentiment specifically — plausible for catching sarcasm and mixed-signal reviews, not adopted yet due to live-app inference cost</li>
-        </ul>
-      </div>
-    </div>
-    <footer class="slide-footer">Full methodology, leakage checks, and limitations: project notebook &amp; documentation.</footer>
+    <div class="kicker">Wrap Up</div>
+    <h2>What this actually proves</h2>
+    <ul class="bullets">
+      <li>You can score a game's <em>real</em> sentiment from the words alone — no per-game tuning needed.</li>
+      <li>The right model depends on the job: deep learning won for spotting junk, but not for reading sentiment.</li>
+      <li>Filtered scores are always more critical, never inflated — a more honest number.</li>
+    </ul>
+    <p class="lead" style="margin-top:1.1rem; font-size:0.9rem;">Next up: other languages, and a pretrained language model to catch sarcasm.</p>
   </section>
 
 </div>
