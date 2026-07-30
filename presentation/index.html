@@ -249,13 +249,15 @@
     <div class="kicker">Live Demo</div>
     <h2>Try it on any game, right now</h2>
     <div class="demo-frame-wrap">
-      <iframe class="demo" id="demoFrame" src="http://localhost:8501/?embed=true"></iframe>
+      <iframe class="demo" id="demoFrame"
+        src="https://steam-review-filter-and-score.streamlit.app/?embed=true"
+        onload="document.getElementById('demoFallback').style.display='none';"
+        onerror="document.getElementById('demoFallback').style.display='flex';"></iframe>
     </div>
-    <p class="muted" style="margin-top:1rem;">
-      Running locally at <code>localhost:8501</code> — start it before presenting with <code>streamlit run app.py</code>.
-      If the frame above is blank, the local server isn't running — fall back to the public deployment:
-      <a href="https://steam-review-filter-and-score.streamlit.app/" target="_blank" style="color:var(--accent);">steam-review-filter-and-score.streamlit.app</a>
-      (may take 30–60s to wake up if it's been idle).
+    <p class="muted" style="margin-top:1rem;" id="demoFallback">
+      If the embedded frame above doesn't load (some browsers block Streamlit's iframe, or the free-tier app is
+      waking up from sleep — can take 30–60s), open it directly instead:
+      <a href="https://steam-review-filter-and-score.streamlit.app/" target="_blank" rel="noopener" style="color:var(--accent);">steam-review-filter-and-score.streamlit.app ↗</a>
     </p>
   </section>
 
