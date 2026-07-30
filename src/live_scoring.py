@@ -37,6 +37,7 @@ import sys
 
 import joblib
 import pandas as pd
+import tensorflow as tf
 from tensorflow import keras
 
 sys.path.append(os.path.dirname(__file__))
@@ -83,8 +84,15 @@ class QualityModel:
         self.model = keras.models.load_model(os.path.join(models_dir, "quality_cnn.keras"))
 
     def predict(self, review_text):
-        text_values = review_text.fillna("").values
-        score = self.model.predict(text_values, verbose=0).flatten()
+        # Neither a pandas .values array (NumPy object dtype -- rejected
+        # with "Invalid dtype: object") nor a bare Python list
+        # ("Unrecognized data type") is reliably accepted as input here
+        # across Keras versions. An explicit tf.string tensor is what
+        # the model's string Input layer actually expects, and works
+        # regardless of Keras/TensorFlow version quirks.
+        text_list = review_text.fillna("").astype(str).tolist()
+        text_tensor = tf.constant(text_list, dtype=tf.string)
+        score = self.model.predict(text_tensor, verbose=0).flatten()
         pred = (score >= 0.5).astype(int)
         return pred, score
 
