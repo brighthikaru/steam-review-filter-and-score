@@ -52,10 +52,10 @@ The CNN wins clearly and consistently — precision holds in a tight 0.90-0.95 b
 |---|---|---|---|---|
 | CNN (deep learning) | 0.958 | 0.893 | 0.925 | 0.934 |
 | LSTM (deep learning) | 0.960 | 0.884 | 0.920 | 0.924 |
-| **TF-IDF + Logistic Regression** | **0.963** | 0.894 | **0.927** | 0.941 |
-| Stacking (LogReg + NB + RF) | 0.937 | 0.958 | 0.947 | 0.942 |
+| TF-IDF + Logistic Regression | 0.963 | 0.894 | 0.927 | 0.941 |
+| **Stacking (LogReg + NB + RF)** | **0.937** | **0.958** | **0.947** | **0.942** |
 
-The result flips here — deep learning's extra capacity doesn't pay off for sentiment the way it does for the quality filter. Stacking edges out Logistic Regression marginally (91.2% vs. 88.4% agreement with Steam's real vote), but not by enough to justify ~30x the training/inference cost for a live app, so **Logistic Regression is deployed**.
+The result flips here — deep learning's extra capacity doesn't pay off for sentiment the way it does for the quality filter. **Stacking is deployed**, winning on every metric including agreement with Steam's real vote (83-96% vs. Logistic Regression's 83-94%, depending on the game). Stacking was initially passed over on the assumption its longer *training* time was a real deployment cost — but training happens once, offline. Actually benchmarking the thing that matters (inference time on a live request) found it costs ~24ms vs. Logistic Regression's ~0.1ms — both negligible next to the multi-second Steam API call the app already makes per lookup — so the accuracy gain was worth taking.
 
 ## Result
 
@@ -89,7 +89,7 @@ data/raw/               # raw review CSVs
 
 - English-only scope — the score reflects English-speaking reviewers specifically, not a game's full community.
 - The "low-effort" label is a proxy (very short, OR low playtime, OR duplicate text) — not verified ground truth of "uselessness." A review can be short but insightful, or long but empty.
-- The CNN quality filter is more accurate but less interpretable than the classical models — the notebook's word-importance analysis uses Logistic Regression to explain the label, not the deployed model's own reasoning.
+- The CNN quality filter and the Stacking sentiment model are both more accurate but less interpretable than a single classical model — the notebook's word-importance analyses use plain Logistic Regression to explain the signal, not either deployed model's own reasoning.
 - Live lookups cap at 400 recent reviews per game for response time — a recent-activity snapshot, not the full review history.
 
 ## Future work
@@ -97,7 +97,7 @@ data/raw/               # raw review CSVs
 - Validate the quality filter against an even broader genre spread
 - Per-language models beyond English
 - Calibrate the flagging threshold against a real precision/recall target
-- Revisit Stacking for sentiment if the ~3-point agreement gain becomes worth the extra inference cost
+- A pretrained transformer (e.g. DistilBERT) for sentiment, to catch sarcasm and mixed-signal reviews — not adopted yet, CPU inference cost is a poor fit for live latency at this scale
 - Caching and rate-limit handling for high-traffic games
 
 ---

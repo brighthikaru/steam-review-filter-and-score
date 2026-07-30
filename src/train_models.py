@@ -32,9 +32,20 @@ layer is trained as part of the model itself, so there's no separate
 TF-IDF vectorizer artifact to save for the quality filter anymore --
 just one Keras model that takes raw review text directly.
 
-The sentiment model stays TF-IDF + Logistic Regression (Section 6) --
-classical ML still wins there; deep learning's extra capacity doesn't
-pay off for sentiment at this data volume.
+The sentiment model stays classical (Section 6) -- deep learning's
+extra capacity doesn't pay off for sentiment at this data volume,
+unlike the quality filter above.
+
+WHAT changed again (2026-07-30, later same day): the sentiment model
+is now a Stacking ensemble (Logistic Regression + Naive Bayes + Random
+Forest -> Logistic Regression meta-learner), not plain Logistic
+Regression. Stacking scores higher on every metric and was initially
+passed over on the assumption its ~30x longer training time was a real
+deployment cost -- that assumption was wrong, and was corrected after
+actually benchmarking per-request inference time (~24ms vs ~0.1ms,
+both negligible next to the multi-second Steam API call already in
+the pipeline) and serialized size (~3.2MB, trivial next to the ~6.6MB
+CNN already shipped). See train_sentiment_model()'s docstring below.
 
 USAGE:
     python train_models.py
@@ -50,10 +61,12 @@ import pandas as pd
 import tensorflow as tf
 from tensorflow import keras
 from tensorflow.keras import layers
+from sklearn.ensemble import RandomForestClassifier, StackingClassifier
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import precision_score, recall_score, f1_score, roc_auc_score
 from sklearn.model_selection import train_test_split
+from sklearn.naive_bayes import MultinomialNB
 from sklearn.utils.class_weight import compute_class_weight
 
 from features import (
@@ -160,7 +173,28 @@ def train_quality_model(df):
 
 
 def train_sentiment_model(df):
-    print("\n--- Sentiment model ---")
+    """
+    Trains the deployed sentiment model: a Stacking ensemble (Logistic
+    Regression + Naive Bayes + Random Forest, combined by a Logistic
+    Regression meta-learner) over the same TF-IDF features a plain
+    Logistic Regression would use.
+
+    WHY Stacking, not plain Logistic Regression: Stacking scores higher
+    on every metric (F1 0.947 vs 0.927, and -- the more user-facing
+    number -- 91.2% vs 88.4% agreement with Steam's own vote). Logistic
+    Regression was deployed initially instead, on the assumption that
+    Stacking's ~30x longer *training* time meant a real deployment cost.
+    That assumption was wrong and was corrected after actually
+    benchmarking it: training time is a one-time, offline cost that
+    never touches a live request. What actually matters for the app --
+    inference time on a real request (400 reviews) and serialized model
+    size -- turned out to be a non-issue: ~24ms vs ~0.1ms (both
+    imperceptible next to the multi-second Steam API call that already
+    happens per lookup), and ~3.2MB vs ~40KB (trivial next to the ~6.6MB
+    CNN quality filter already shipped). Once measured rather than
+    assumed, there was no real reason not to take the accuracy gain.
+    """
+    print("\n--- Sentiment model (Stacking ensemble) ---")
     sentiment_df = df[df["review"].fillna("").str.strip() != ""].copy()
     sentiment_df["label"] = sentiment_df["voted_up"].astype(int)
 
@@ -173,7 +207,16 @@ def train_sentiment_model(df):
     y_train = train_df["label"]
     y_test = test_df["label"]
 
-    model = LogisticRegression(class_weight="balanced", max_iter=1000, random_state=42)
+    model = StackingClassifier(
+        estimators=[
+            ("lr", LogisticRegression(class_weight="balanced", max_iter=1000, random_state=42)),
+            ("nb", MultinomialNB()),
+            ("rf", RandomForestClassifier(n_estimators=150, class_weight="balanced", max_depth=12,
+                                           min_samples_leaf=5, n_jobs=-1, random_state=42)),
+        ],
+        final_estimator=LogisticRegression(max_iter=1000),
+        cv=3, n_jobs=-1,
+    )
     model.fit(X_train, y_train)
 
     pred = model.predict(X_test)

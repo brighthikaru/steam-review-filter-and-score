@@ -84,20 +84,17 @@ with st.expander("How this works, and what it can't do"):
   across six different game genres in testing -- it beat every classical ML model tried).
   It needs nothing but the text, so it works the same way for any game, not just ones
   it was trained on.
-- The **sentiment model** (Section 6) predicts positive/negative from text alone,
+- The **sentiment model** (Section 6) is a Stacking ensemble (Logistic Regression +
+  Naive Bayes + Random Forest) that predicts positive/negative from text alone,
   independent of Steam's own vote -- shown here side-by-side with Steam's real vote
-  as a built-in accuracy check (they agree 83-94% of the time across the games tested).
+  as a built-in accuracy check (they agree 83-96% of the time across the games tested).
 - Scoring is scoped to **English-language reviews only** -- both by requesting
   `language=english` from Steam and by dropping any review containing non-Latin
   script, since a review that can't be manually verified isn't defensible. For games
   with a large non-English review base, this score reflects English-speaking
   reviewers specifically, not the full community.
-- An earlier version of this project also tried to detect coordinated review-bomb
-  campaigns using posting-time patterns; that approach didn't generalise to games
-  outside its training set and was dropped -- see the notebook's Section 5.7 for
-  the full story. Negativity driven by something other than gameplay (e.g. a
-  monetisation controversy) is treated here as genuine sentiment, not noise to
-  filter out.
+- Negativity driven by something other than gameplay (e.g. a monetisation
+  controversy) is treated here as genuine sentiment, not noise to filter out.
         """
     )
 
