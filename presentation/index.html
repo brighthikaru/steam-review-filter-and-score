@@ -197,28 +197,34 @@
   <!-- 6. Model 1 -->
   <section id="slide-model1">
     <div class="kicker">Model 1 — Language-Based Quality Filter</div>
-    <h2>Predicting "low-effort" from text alone</h2>
+    <h2>Predicting "low-effort" from text alone — 6 models tested</h2>
     <table>
       <tr><th>Model</th><th>Precision</th><th>Recall</th><th>F1</th><th>ROC-AUC</th></tr>
-      <tr><td><strong>TF-IDF + Logistic Regression</strong></td><td><strong>0.821</strong></td><td>0.934</td><td><strong>0.874</strong></td><td><strong>0.960</strong></td></tr>
+      <tr><td>TF-IDF + Naive Bayes</td><td>0.799</td><td>0.620</td><td>0.698</td><td>0.911</td></tr>
       <tr><td>TF-IDF + Random Forest</td><td>0.716</td><td>0.972</td><td>0.825</td><td>0.952</td></tr>
+      <tr><td>TF-IDF + Linear SVM</td><td>0.848</td><td>0.906</td><td>0.876</td><td>0.956</td></tr>
+      <tr><td>TF-IDF + Logistic Regression</td><td>0.821</td><td>0.934</td><td>0.874</td><td>0.960</td></tr>
+      <tr><td>Stacking (LogReg+NB+RF)</td><td>0.860</td><td>0.905</td><td>0.882</td><td>0.962</td></tr>
+      <tr><td><strong>CNN (deployed)</strong></td><td><strong>0.925</strong></td><td><strong>0.958</strong></td><td><strong>0.941</strong></td><td><strong>0.986</strong></td></tr>
     </table>
     <p class="lead" style="font-size:1.05rem; margin-top:1.5rem;">
-      Precision 0.77-0.87 and recall 0.92-0.95, consistent across all six genres — including four the model wasn't specifically tuned toward. Top low-effort terms: <code>good</code>, <code>gud</code>, and genre-specific memes (<code>for democracy</code>, <code>pootis</code>) — generic writing patterns, not one controversy's vocabulary.
+      The CNN wins clearly — precision holds in a tight 0.90-0.95 band across all six genres, not just on average. Top low-effort terms (from the classical model, used for interpretability): <code>good</code>, <code>gud</code>, and genre-specific memes (<code>for democracy</code>, <code>pootis</code>) — generic writing patterns, not one controversy's vocabulary.
     </p>
   </section>
 
   <!-- 7. Model 2 -->
   <section id="slide-model2">
     <div class="kicker">Model 2 — Sentiment Scoring</div>
-    <h2>Classical ML vs. deep learning — closer than you'd think</h2>
+    <h2>The result flips: deep learning doesn't win here</h2>
     <table>
       <tr><th>Model</th><th>Precision</th><th>Recall</th><th>F1</th><th>ROC-AUC</th></tr>
-      <tr><td><strong>TF-IDF + Logistic Regression</strong></td><td><strong>0.963</strong></td><td>0.894</td><td><strong>0.927</strong></td><td><strong>0.941</strong></td></tr>
+      <tr><td>CNN (deep learning)</td><td>0.958</td><td>0.893</td><td>0.925</td><td>0.934</td></tr>
       <tr><td>LSTM (deep learning)</td><td>0.960</td><td>0.884</td><td>0.920</td><td>0.924</td></tr>
+      <tr><td><strong>TF-IDF + Logistic Regression (deployed)</strong></td><td><strong>0.963</strong></td><td>0.894</td><td><strong>0.927</strong></td><td>0.941</td></tr>
+      <tr><td>Stacking (LogReg+NB+RF)</td><td>0.937</td><td>0.958</td><td>0.947</td><td>0.942</td></tr>
     </table>
     <p class="lead" style="font-size:1.05rem; margin-top:1.5rem;">
-      Deep learning's extra capacity isn't paying off at ~33,000 training rows — a real, honest finding, and the reason the live app uses the simpler, lighter model (no TensorFlow dependency to deploy).
+      The same CNN architecture that won decisively for the quality filter comes in <em>behind</em> Logistic Regression here. Stacking edges out LogReg slightly (91.2% vs. 88.4% agreement with Steam's real vote) but isn't worth ~30x the training cost for a live app — a genuinely useful negative result: more capacity doesn't transfer automatically between related tasks.
     </p>
   </section>
 
@@ -267,14 +273,14 @@
     <h2>What this proves, and what's next</h2>
     <div class="grid2">
       <div>
-        <p class="lead" style="font-size:1.1rem;">A language-only model can both predict sentiment (ROC-AUC 0.94, 83-94% agreement with Steam's real vote) and filter low-effort reviews (ROC-AUC 0.96) consistently across six genuinely different genres — without needing any per-game metadata or timing signal.</p>
+        <p class="lead" style="font-size:1.1rem;">A language-only pipeline can both filter low-effort reviews (CNN, ROC-AUC 0.986) and predict sentiment (Logistic Regression, ROC-AUC 0.941, 83-94% agreement with Steam's real vote) consistently across six genuinely different genres — without needing any per-game metadata or timing signal. The winning model differed by task: deep learning paid off for quality filtering, not for sentiment.</p>
       </div>
       <div class="card">
         <ul class="bullets" style="font-size:1rem;">
           <li>Validate against an even broader genre spread</li>
           <li>Per-language models beyond English</li>
           <li>Calibrate the flagging threshold to a real precision/recall target</li>
-          <li>Caching and rate-limit handling for high-traffic games</li>
+          <li>Pretrained transformer (e.g. DistilBERT) for sentiment specifically — plausible for catching sarcasm and mixed-signal reviews, not adopted yet due to live-app inference cost</li>
         </ul>
       </div>
     </div>
