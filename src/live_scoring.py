@@ -13,23 +13,17 @@ well" using historical data. This module answers a different question
 at a different time -- "what does this say about a game a user just
 typed in, right now" -- using only the trained artifacts.
 
-WHAT changed from the earlier version of this script (2026-07-29): the
-quality filter used to need a per-game temporal baseline (a "what's
-normal daily review volume" reference), computed on the fly for
-new games since only the 4 training games had one from labeled data.
-That whole design is gone now -- the quality filter (see notebook
-Section 5) is trained on review TEXT ALONE, predicting a game-agnostic
-"low-effort" label. It needs nothing but the review text at inference
-time, so there's no per-game baseline to fit, no timing features, and
-no risk of the baseline being wrong for a brand-new game.
+The quality filter (see notebook Section 5) is trained on review TEXT
+ALONE, predicting a game-agnostic "low-effort" label. It needs nothing
+but the review text at inference time, so there's no per-game baseline
+to fit, no timing features, and no risk of a baseline being wrong for
+a brand-new game.
 
-This module also now loads a SENTIMENT model (previously skipped,
-since the app relied solely on Steam's own `voted_up` as ground
-truth). The app now shows the sentiment model's own text-based
-prediction side-by-side with Steam's real vote -- per Hikaru's
-request, 2026-07-29 -- both as a demonstration that the model works,
-and because a model that predicts sentiment from text alone is
-portable to any source of review text, not just Steam's API.
+This module also loads a SENTIMENT model. The app shows the sentiment
+model's own text-based prediction side-by-side with Steam's real vote,
+both as a demonstration that the model works, and because a model that
+predicts sentiment from text alone is portable to any source of review
+text, not just Steam's API.
 """
 
 import os
@@ -48,9 +42,9 @@ from collect_reviews import pull_reviews, review_to_row
 # models/ is the output of train_models.py, one level up at the project root.
 MODELS_DIR = os.path.join(os.path.dirname(__file__), "..", "models")
 
-# How many recent reviews to pull for a live lookup. Smaller than the
-# 8,000-per-game training pulls -- this needs to feel responsive in an
-# app, not exhaustive like the training data collection was.
+# How many recent reviews to pull for a live lookup. Much smaller than
+# the 20,000-per-game training pulls -- this needs to feel responsive in
+# an app, not exhaustive like the training data collection was.
 LIVE_PULL_TARGET = 400
 
 
@@ -77,8 +71,7 @@ class QualityModel:
     """Loads the CNN low-effort/junk quality filter saved by
     train_models.py. Needs nothing but review text -- the
     TextVectorization vocabulary is baked into the saved Keras model,
-    so there's no separate vectorizer artifact to load (unlike the
-    earlier TF-IDF + Logistic Regression version)."""
+    so there's no separate vectorizer artifact to load."""
 
     def __init__(self, models_dir=MODELS_DIR):
         self.model = keras.models.load_model(os.path.join(models_dir, "quality_cnn.keras"))

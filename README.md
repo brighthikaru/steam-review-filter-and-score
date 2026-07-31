@@ -16,16 +16,19 @@ Try it: **[steam-review-filter-and-score.streamlit.app](https://steam-review-fil
 
 ## Dataset
 
-~48,000 reviews across 6 games, pulled directly from Steam's public `appreviews` API — chosen to span genuinely different genres, not just different games:
+140,000 reviews across 7 games, pulled directly from Steam's public `appreviews` API — chosen to span genuinely different genres, not just different games:
 
-| Game | Genre | Reviews |
-|---|---|---|
-| Helldivers 2 | Co-op shooter | 8,000 |
-| Team Fortress 2 | Multiplayer FPS | 8,000 |
-| Slay the Spire 2 | Deck-building roguelike | 8,000 |
-| Forza Horizon 5 | Racing | 8,000 |
-| Resident Evil Requiem | Survival horror / adventure | 8,000 |
-| Tekken 8 | Fighting | 8,000 |
+| Game | Genre | Sampled | Total English reviews | % sampled |
+|---|---|---|---|---|
+| Helldivers 2 | Co-op action shooter | 20,000 | 816,065 | 2.5% |
+| Team Fortress 2 | Multiplayer FPS | 20,000 | 739,332 | 2.7% |
+| Cyberpunk 2077 | Open-world RPG | 20,000 | 411,481 | 4.9% |
+| Resident Evil Requiem | Survival horror / adventure | 20,000 | 79,019 | 25.3% |
+| Slay the Spire 2 | Deck-building roguelike | 20,000 | 72,061 | 27.8% |
+| Forza Horizon 5 | Racing | 20,000 | 97,866 | 20.4% |
+| Tekken 8 | Fighting | 20,000 | 43,200 | 46.3% |
+
+20,000 per game is a practical cap, not an exhaustive pull — it keeps training time manageable and keeps every game contributing equally to what the models learn as "normal" text. For high-volume games this is a thin recent slice (under 5% of history); for lower-volume games it's closer to their whole recent history — worth knowing when interpreting per-game results.
 
 Scoped to English-only — I can't verify a review's sentiment in a language I can't read, so it wouldn't be defensible to include it. Steam's own `language` tag turned out to be reviewer-selected, not content-checked (~1.2% of "english"-tagged reviews were actually in another language), so I added a second, content-based filter on top of it.
 
@@ -33,33 +36,33 @@ Scoped to English-only — I can't verify a review's sentiment in a language I c
 
 Both models are trained on review **text alone** — no playtime, review count, or timing metadata is fed into either one at inference time. That's deliberate: it means the same model works on a review pulled from anywhere, and there's nothing per-game to recalibrate for a brand-new game the app has never seen. (Playtime, review length, and duplicate text are used only to *construct* the training label below — never as a model input.)
 
-**Quality filter** — is this review low-effort/junk? Five model families tested:
+**Quality filter** — is this review low-effort/junk? Six model families tested:
 
 | Model | Precision | Recall | F1 | ROC-AUC |
 |---|---|---|---|---|
-| TF-IDF + Naive Bayes | 0.799 | 0.620 | 0.698 | 0.911 |
-| TF-IDF + Random Forest | 0.716 | 0.972 | 0.825 | 0.952 |
-| TF-IDF + Linear SVM | 0.848 | 0.906 | 0.876 | 0.956 |
-| TF-IDF + Logistic Regression | 0.821 | 0.934 | 0.874 | 0.960 |
-| Stacking (LogReg + NB + RF) | 0.860 | 0.905 | 0.882 | 0.962 |
-| **CNN (deep learning)** | **0.925** | **0.958** | **0.941** | **0.986** |
+| TF-IDF + Naive Bayes | 0.790 | 0.604 | 0.685 | 0.911 |
+| TF-IDF + Random Forest | 0.705 | 0.971 | 0.817 | 0.954 |
+| TF-IDF + Linear SVM | 0.845 | 0.891 | 0.867 | 0.956 |
+| TF-IDF + Logistic Regression | 0.827 | 0.931 | 0.876 | 0.962 |
+| Stacking (LogReg + NB + RF) | 0.867 | 0.900 | 0.883 | 0.963 |
+| **CNN (deep learning)** | **0.930** | **0.957** | **0.943** | **0.987** |
 
-The CNN wins clearly and consistently — precision holds in a tight 0.90-0.95 band across all six genres, not just on average. It's the model deployed in the app.
+The CNN wins clearly and consistently — precision holds in a tight 0.90-0.96 band across all seven genres (including Cyberpunk 2077's RPG-style long-form reviews, which fit right into that band), not just on average. It's the model deployed in the app.
 
 **Sentiment scoring** — positive or negative, from text alone:
 
 | Model | Precision | Recall | F1 | ROC-AUC |
 |---|---|---|---|---|
-| CNN (deep learning) | 0.958 | 0.893 | 0.925 | 0.934 |
-| LSTM (deep learning) | 0.960 | 0.884 | 0.920 | 0.924 |
-| TF-IDF + Logistic Regression | 0.963 | 0.894 | 0.927 | 0.941 |
-| **Stacking (LogReg + NB + RF)** | **0.937** | **0.958** | **0.947** | **0.942** |
+| LSTM (deep learning) | 0.958 | 0.915 | 0.936 | 0.950 |
+| CNN (deep learning) | 0.956 | 0.922 | 0.939 | 0.955 |
+| TF-IDF + Logistic Regression | 0.961 | 0.914 | 0.937 | 0.959 |
+| **Stacking (LogReg + NB + RF)** | **0.942** | **0.954** | **0.948** | **0.959** |
 
-The result flips here — deep learning's extra capacity doesn't pay off for sentiment the way it does for the quality filter. **Stacking is deployed**, winning on every metric including agreement with Steam's real vote (83-96% vs. Logistic Regression's 83-94%, depending on the game), with per-request inference time (~24ms on a realistic 400-review batch) negligible next to the multi-second Steam API call the app already makes per lookup.
+**Stacking is deployed.** It wins on F1 and recall (0.948/0.954 vs. Logistic Regression's 0.937/0.914) and on agreement with Steam's real vote (91.8% overall vs. Logistic Regression's 90.4%), though it ties Logistic Regression exactly on ROC-AUC (0.959 both) — worth stating plainly rather than only reporting the metric that favours the deployed model. Per-request inference time (~24ms on a realistic 400-review batch) stays negligible next to the multi-second Steam API call the app already makes per lookup.
 
 ## Result
 
-Filtering out low-effort reviews **lowers** the positive percentage for every single game — a consistent, non-obvious finding. Low-effort reviews skew more positive than substantive ones (a quick "10/10 gg" throwaway is far more common than a quick throwaway complaint), so removing them reveals a more critical, more considered version of a game's sentiment. Helldivers 2 shows the largest shift, crossing a full Steam category from "Mostly Positive" to "Mixed" once low-effort praise is removed. Full numbers and per-game breakdown in the notebook.
+Filtering out low-effort reviews **lowers** the positive percentage for every single game — a consistent, non-obvious finding across all seven titles. Low-effort reviews skew more positive than substantive ones (a quick "10/10 gg" throwaway is far more common than a quick throwaway complaint), so removing them reveals a more critical, more considered version of a game's sentiment. The clearest category shifts: Tekken 8 drops from "Mixed" to "Mostly Negative" (47.6% → 39.2%), and Forza Horizon 5 drops from "Very Positive" to "Mostly Positive" (88.7% → 79.7%), once low-effort praise is removed. Full numbers and per-game breakdown in the notebook.
 
 ## Running it locally
 

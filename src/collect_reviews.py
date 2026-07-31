@@ -22,19 +22,19 @@ HOW it works (read this before you run it):
     Two important, non-obvious parameter choices baked into this script:
 
     - `filter_offtopic_activity=0`
-        By default Steam SILENTLY REMOVES review-bomb reviews from API
-        results (their own anti-abuse filtering). Since this whole project
-        is about detecting review bombs, we have to explicitly ask for
-        them back with this flag. Without it, you'd pull data for a known
-        review-bombed game and see nothing unusual -- not because your
-        model failed, but because the reviews were never in your dataset.
+        By default Steam silently removes reviews it's flagged as
+        off-topic/review-bomb activity from API results. This project
+        deliberately asks for them back: real-world negativity (e.g. a
+        monetisation controversy) is treated as genuine sentiment for a
+        language-based filter to read, not noise to exclude before the
+        model even sees it.
 
     - `language` and `purchase_type=all`
         Leaving `purchase_type` unset silently narrows the result set
-        (confirmed by hand: querying War Thunder without an explicit
-        value returned a `total_reviews` count of 831 instead of the
-        real ~768,000). Always pass it explicitly or your totals will be
-        wrong and you won't notice.
+        (confirmed by hand -- querying without an explicit value
+        returns a much smaller `total_reviews` count than the real
+        total). Always pass it explicitly or your totals will be wrong
+        and you won't notice.
 
         `language` is deliberately set to `"english"`, not `"all"`. This
         project's scope is English-language reviews only -- verified live
@@ -44,36 +44,23 @@ HOW it works (read this before you run it):
         sample (which would have unevenly shrunk each game/slice instead
         of giving properly-sized English-only pulls).
 
-    PROJECT SCOPE CHANGE (2026-07-29): earlier versions of this script
-    pulled a separate "bomb window" slice for games with a known
-    review-bomb event, so a temporal (timing-based) feature could try to
-    detect the bomb directly. That approach was dropped after two
-    findings during modelling: (1) a text-based quality model trained on
-    "was this review from the bomb window" ended up learning words
-    specific to that one controversy rather than a generalisable
-    "low-quality review" signal, and (2) tree-based models exploited a
-    confound in the temporal z-score feature caused by how narrowly the
-    one bomb-window sample was collected, rather than learning a real
-    "abnormal volume" signal (see the notebook's Model 1 section for the
-    full investigation). The project's actual goal is a language-based
-    filter that judges review quality from the text itself, not a
-    bomb-timing detector -- so every game below is now pulled the same
-    simple way: the most recent `TARGET_PER_GAME` English reviews, no
-    special windows, no bomb/baseline split. Any review-bombing or
+    Every game is pulled the same simple way: the most recent
+    `TARGET_PER_GAME` English reviews, no special date windows. This
+    keeps collection identical across every game, with no game-specific
+    event tied to any part of the pipeline. Any review-bombing or
     monetisation-backlash context for a given game (e.g. Tekken 8's
-    2024 monetisation controversy) is noted in the project documentation
-    as real-world context for why a game's sentiment may look mixed --
-    not something the pipeline tries to detect from timing.
+    ongoing monetisation controversy) is noted in the project
+    documentation as real-world context for why a game's sentiment may
+    look mixed -- the pipeline itself judges quality and sentiment from
+    review text alone, not from when a review was posted.
 
-    IMPORTANT LESSON LEARNED (2026-07-22, kept for reference): Steam's
-    cursor pagination for the "recent"/"updated" filters only reliably
-    reaches back so far for high-volume games -- in testing, pulling
-    reviews from over a year ago (War Thunder May 2023, Helldivers 2 May
-    2024) returned 0 results even after the pull otherwise completed
-    normally. This is a known limitation of the API itself
-    (community-reported). Practical takeaway, still relevant now that
-    every pull is "most recent N reviews": don't expect to reach deep
-    into a high-volume game's history this way.
+    A NOTE ON HIGH-VOLUME GAMES: Steam's cursor pagination for the
+    "recent" filter only reliably reaches back so far for very
+    high-volume games -- don't expect to page deep into a game's full
+    history this way. Since every pull here targets only the most
+    recent `TARGET_PER_GAME` reviews, this doesn't affect this project,
+    but it's worth knowing if `TARGET_PER_GAME` is ever raised
+    significantly higher.
 
 USAGE:
     python collect_reviews.py                # pull all games below
@@ -98,9 +85,8 @@ import requests
 # genre: noted for the project write-up (EDA/dataset diversity), not used
 #   by any pipeline code.
 # All games are pulled the same way -- most recent TARGET_PER_GAME
-# English reviews, no special date windows. See the module docstring
-# above for why the earlier bomb-window/baseline-window split was
-# dropped.
+# English reviews, no special date windows (see the module docstring
+# above for why).
 GAMES = [
     {
         "appid": 553850,
@@ -119,12 +105,10 @@ GAMES = [
         "name": "Slay the Spire 2",
         "genre": "Deck-building roguelike",
         # Verified live 2026-07-22: 191,251 total reviews, "Mixed" overall
-        # (down from "Overwhelmingly Positive") following a 2026-05-05
-        # controversy over a consultant credit. Kept in the dataset for
-        # its genuinely mixed, sometimes-heated review text -- exactly
-        # the kind of real-world noise the language-based quality filter
-        # needs to be able to handle -- but no longer pulled with a
-        # special bomb-window/baseline split (see module docstring).
+        # following a 2026-05-05 controversy over a consultant credit.
+        # Kept in the dataset for its genuinely mixed, sometimes-heated
+        # review text -- exactly the kind of real-world noise the
+        # language-based quality filter needs to be able to handle.
     },
     {
         "appid": 1551360,
@@ -147,22 +131,29 @@ GAMES = [
         # Verified live 2026-07-29: 43,183 total reviews, review_score 5
         # ("Mixed") -- real, ongoing negativity tied to a monetisation
         # controversy (battle pass / in-game store backlash). Included
-        # deliberately for its mixed real-world sentiment, but NOT set up
-        # as a bomb-window case study -- any monetisation-driven
-        # negativity here is noted as real-world context in the project
-        # documentation, not something the pipeline tries to detect.
+        # deliberately for its mixed real-world sentiment; any
+        # monetisation-driven negativity here is noted as real-world
+        # context in the project documentation, not something the
+        # pipeline tries to detect.
+    },
+    {
+        "appid": 1091500,
+        "name": "Cyberpunk 2077",
+        "genre": "Open-world RPG",
+        # Included for its open-world RPG genre -- long-form,
+        # narrative-focused reviews with a very different writing style
+        # than the rest of the dataset. Verified live: 411,481 total
+        # English reviews, "Very Positive" -- comfortably supports 20,000.
     },
 ]
 
 # How many reviews to aim for per game. Kept equal across every game so
 # no single title dominates what the language-based quality/sentiment
-# models learn as "normal" text. 8,000 is a deliberate middle ground
-# between the original 4,000 and pulling a game's entire review history
-# (Team Fortress 2 alone has 1.24M lifetime reviews -- "all reviews" for
-# every game here would mean hours of paginated requests per game and a
-# training set large enough to slow down every retrain, for no real
-# modelling benefit once you have a large, diverse sample).
-TARGET_PER_GAME = 8000
+# models learn as "normal" text. 20,000 per game gives both models
+# (particularly the CNN and Stacking ensemble) enough training rows to
+# keep improving without any one title's writing style dominating the
+# pooled dataset.
+TARGET_PER_GAME = 20000
 
 OUTPUT_DIR = os.path.join(os.path.dirname(__file__), "..", "data", "raw")
 
@@ -346,10 +337,9 @@ def main():
         print(f"Pulling reviews for {name} (appid {appid})...")
 
         # Every game: most recent TARGET_PER_GAME English reviews, no
-        # date window. `_slice` is kept as "baseline" on every row purely
-        # so review_to_row()/save_csv() (and any older code that still
-        # reads a `slice` column) keep working unchanged -- it no longer
-        # carries any real meaning now that there's no bomb-window split.
+        # date window. `_slice` is a fixed "baseline" tag on every row --
+        # kept in the schema for compatibility with review_to_row()/
+        # save_csv(), which both expect the column to exist.
         all_rows = pull_reviews(appid, name, TARGET_PER_GAME)
         for r in all_rows:
             r["_slice"] = "baseline"

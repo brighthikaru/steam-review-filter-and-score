@@ -2,7 +2,7 @@
 train_models.py
 
 Trains both deployed models -- the language-based review-quality filter
-and the sentiment classifier -- on the project's 6-game dataset, and
+and the sentiment classifier -- on the project's 7-game dataset, and
 saves the fitted pieces to disk so the live demo app can load and score
 brand-new games without re-running the notebook.
 
@@ -13,39 +13,27 @@ model files) that a completely different program (app.py) depends on.
 Mixing the two would mean the app breaks any time someone edits the
 notebook's markdown or adds an exploratory cell.
 
-WHAT changed from the earlier version of this script (2026-07-29): the
-quality filter used to be a structural-features-plus-text model trained
-on "was this review posted during one specific game's bombing event."
-That approach was dropped -- see the notebook's Section 5.7 for why
-(it didn't generalise to games outside its training set). The quality
-filter here is now trained on review TEXT ALONE, predicting a
+The quality filter is trained on review TEXT ALONE, predicting a
 game-agnostic "low-effort" proxy label (very-short OR low-playtime OR
-duplicate-text) -- see notebook Section 4.2/5.
-
-WHAT changed again (2026-07-30): the quality filter is now a CNN
-(Keras/TensorFlow), not TF-IDF + Logistic Regression. A comparison in
-the notebook (Section 5) found a CNN substantially outperforms every
-classical model tried (ROC-AUC 0.986 vs. 0.962 for the best classical
-candidate), consistent across all six game genres -- a real, checked
-result, not just a higher headline number. The CNN's TextVectorization
-layer is trained as part of the model itself, so there's no separate
-TF-IDF vectorizer artifact to save for the quality filter anymore --
-just one Keras model that takes raw review text directly.
+duplicate-text) -- see notebook Section 4.2/5. It's a CNN
+(Keras/TensorFlow): the notebook's Section 5 model comparison found a
+CNN substantially outperforms every classical model tried (ROC-AUC
+0.987 vs. 0.963 for the best classical candidate), consistent across
+all seven game genres. The CNN's TextVectorization layer is trained as
+part of the model itself, so there's no separate TF-IDF vectorizer
+artifact to save for the quality filter -- just one Keras model that
+takes raw review text directly.
 
 The sentiment model stays classical (Section 6) -- deep learning's
-extra capacity doesn't pay off for sentiment at this data volume,
-unlike the quality filter above.
-
-WHAT changed again (2026-07-30, later same day): the sentiment model
-is now a Stacking ensemble (Logistic Regression + Naive Bayes + Random
-Forest -> Logistic Regression meta-learner), not plain Logistic
-Regression. Stacking scores higher on every metric and was initially
-passed over on the assumption its ~30x longer training time was a real
-deployment cost -- that assumption was wrong, and was corrected after
-actually benchmarking per-request inference time (~24ms vs ~0.1ms,
-both negligible next to the multi-second Steam API call already in
-the pipeline) and serialized size (~3.2MB, trivial next to the ~6.6MB
-CNN already shipped). See train_sentiment_model()'s docstring below.
+extra capacity doesn't pay off for sentiment at this data volume, and
+is a Stacking ensemble (Logistic Regression + Naive Bayes + Random
+Forest -> Logistic Regression meta-learner). Stacking wins on F1,
+recall, and agreement with Steam's real vote (see the notebook's
+Section 6.5b-d for the full model comparison); its per-request
+inference time (~24ms on a realistic 400-review batch) and serialized
+size (~3.2MB) are both negligible next to the CNN quality filter
+already shipped (~6.6MB) and the multi-second Steam API call the app
+makes per lookup. See train_sentiment_model()'s docstring below.
 
 USAGE:
     python train_models.py
@@ -179,20 +167,21 @@ def train_sentiment_model(df):
     Regression meta-learner) over the same TF-IDF features a plain
     Logistic Regression would use.
 
-    WHY Stacking, not plain Logistic Regression: Stacking scores higher
-    on every metric (F1 0.947 vs 0.927, and -- the more user-facing
-    number -- 91.2% vs 88.4% agreement with Steam's own vote). Logistic
-    Regression was deployed initially instead, on the assumption that
-    Stacking's ~30x longer *training* time meant a real deployment cost.
-    That assumption was wrong and was corrected after actually
-    benchmarking it: training time is a one-time, offline cost that
-    never touches a live request. What actually matters for the app --
-    inference time on a real request (400 reviews) and serialized model
-    size -- turned out to be a non-issue: ~24ms vs ~0.1ms (both
-    imperceptible next to the multi-second Steam API call that already
-    happens per lookup), and ~3.2MB vs ~40KB (trivial next to the ~6.6MB
-    CNN quality filter already shipped). Once measured rather than
-    assumed, there was no real reason not to take the accuracy gain.
+    WHY Stacking, not plain Logistic Regression: Stacking wins on F1
+    (0.948 vs 0.937) and recall (0.954 vs 0.914), and -- the more
+    user-facing number -- agrees with Steam's own vote more often
+    (91.8% vs 90.4%). It ties Logistic Regression exactly on ROC-AUC
+    (0.959 both), which is reported honestly in the notebook rather than
+    only citing the metrics that favour Stacking.
+
+    Stacking's training time is roughly 30x longer than Logistic
+    Regression's, but that's a one-time, offline cost that never touches
+    a live request -- what matters for the app is inference time on a
+    real request (400 reviews) and serialized model size, and both are a
+    non-issue: ~24ms vs ~0.1ms (both imperceptible next to the
+    multi-second Steam API call that already happens per lookup), and
+    ~3.2MB vs ~40KB (trivial next to the ~6.6MB CNN quality filter
+    already shipped).
     """
     print("\n--- Sentiment model (Stacking ensemble) ---")
     sentiment_df = df[df["review"].fillna("").str.strip() != ""].copy()

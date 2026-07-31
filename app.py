@@ -13,11 +13,10 @@ live_scoring.py pipeline code the notebook's approach is built on, and
 the exact models trained by train_models.py, so there is exactly one
 implementation of "how do we score this review" in the whole project.
 
-WHAT changed (2026-07-29): the quality filter is now a purely
-language-based model (no structural features, no per-game timing
-baseline) -- see the notebook's Section 5 for why. The app also now
-loads a sentiment model and shows its prediction next to Steam's real
-vote, rather than relying solely on Steam's vote as before.
+The quality filter is a purely language-based model (no structural
+features, no per-game timing baseline) -- see the notebook's Section 5
+for why. The app also loads a sentiment model and shows its prediction
+next to Steam's real vote, as a built-in accuracy check.
 
 RUN:
     streamlit run app.py
@@ -80,14 +79,14 @@ with st.expander("How this works, and what it can't do"):
 - Reviews are pulled live from Steam's public API.
 - The **quality filter** is a CNN (convolutional neural network) trained on review text
   alone to predict a game-agnostic "low-effort" label (very short, low playtime, or
-  duplicate text) -- see the project notebook, Section 5 (ROC-AUC 0.986, consistent
-  across six different game genres in testing -- it beat every classical ML model tried).
+  duplicate text) -- see the project notebook, Section 5 (ROC-AUC 0.987, consistent
+  across seven different game genres in testing -- it beat every classical ML model tried).
   It needs nothing but the text, so it works the same way for any game, not just ones
   it was trained on.
 - The **sentiment model** (Section 6) is a Stacking ensemble (Logistic Regression +
   Naive Bayes + Random Forest) that predicts positive/negative from text alone,
   independent of Steam's own vote -- shown here side-by-side with Steam's real vote
-  as a built-in accuracy check (they agree 83-96% of the time across the games tested).
+  as a built-in accuracy check (they agree 82-96% of the time across the games tested).
 - Scoring is scoped to **English-language reviews only** -- both by requesting
   `language=english` from Steam and by dropping any review containing non-Latin
   script, since a review that can't be manually verified isn't defensible. For games
