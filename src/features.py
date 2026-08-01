@@ -37,10 +37,9 @@ def drop_non_english_reviews(df, text_col="review"):
     WHY: Steam's `language=english` API parameter (used in
     collect_reviews.py) filters on a tag the REVIEWER selects when they
     post -- not on the actual text. People mislabel it, especially
-    during review-bomb events where reviews get posted in bulk. Manual
-    inspection of the collected data found ~1-2% of rows tagged
-    "english" that were actually written in Chinese, Korean, Russian, or
-    Arabic.
+    during high-volume posting spikes. Manual inspection of the
+    collected data found ~1-2% of rows tagged "english" that were
+    actually written in Chinese, Korean, Russian, or Arabic.
 
     This project's scope is English-only because the reviews need to be
     manually verifiable -- if a reviewer can't read the text, they can't

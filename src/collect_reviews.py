@@ -23,11 +23,11 @@ HOW it works (read this before you run it):
 
     - `filter_offtopic_activity=0`
         By default Steam silently removes reviews it's flagged as
-        off-topic/review-bomb activity from API results. This project
-        deliberately asks for them back: real-world negativity (e.g. a
-        monetisation controversy) is treated as genuine sentiment for a
-        language-based filter to read, not noise to exclude before the
-        model even sees it.
+        off-topic activity from API results. This project deliberately
+        asks for them back: real-world negativity (e.g. a monetisation
+        controversy) is treated as genuine sentiment for a language-based
+        filter to read, not noise to exclude before the model even sees
+        it.
 
     - `language` and `purchase_type=all`
         Leaving `purchase_type` unset silently narrows the result set
@@ -47,12 +47,12 @@ HOW it works (read this before you run it):
     Every game is pulled the same simple way: the most recent
     `TARGET_PER_GAME` English reviews, no special date windows. This
     keeps collection identical across every game, with no game-specific
-    event tied to any part of the pipeline. Any review-bombing or
-    monetisation-backlash context for a given game (e.g. Tekken 8's
-    ongoing monetisation controversy) is noted in the project
-    documentation as real-world context for why a game's sentiment may
-    look mixed -- the pipeline itself judges quality and sentiment from
-    review text alone, not from when a review was posted.
+    event tied to any part of the pipeline. Any real-world controversy
+    context for a given game (e.g. Tekken 8's ongoing monetisation
+    backlash) is noted in the project documentation as context for why
+    a game's sentiment may look mixed -- the pipeline itself judges
+    quality and sentiment from review text alone, not from when a
+    review was posted.
 
     A NOTE ON HIGH-VOLUME GAMES: Steam's cursor pagination for the
     "recent" filter only reliably reaches back so far for very
@@ -203,7 +203,7 @@ def fetch_page(appid, cursor="*", num_per_page=100):
         "purchase_type": "all",
         "num_per_page": num_per_page,
         "cursor": cursor,
-        "filter_offtopic_activity": 0,  # include review-bomb reviews
+        "filter_offtopic_activity": 0,  # include flagged off-topic reviews
     }
     try:
         resp = requests.get(url, params=params, timeout=15)
