@@ -30,7 +30,7 @@ is a Stacking ensemble (Logistic Regression + Naive Bayes + Random
 Forest -> Logistic Regression meta-learner). Stacking wins on F1,
 recall, and agreement with Steam's real vote (see the notebook's
 Section 6.5b-d for the full model comparison); its per-request
-inference time (~24ms on a realistic 400-review batch) and serialized
+inference time (~65ms on a realistic 1,000-review batch) and serialized
 size (~3.2MB) are both negligible next to the CNN quality filter
 already shipped (~6.6MB) and the multi-second Steam API call the app
 makes per lookup. See train_sentiment_model()'s docstring below.
@@ -177,8 +177,8 @@ def train_sentiment_model(df):
     Stacking's training time is roughly 30x longer than Logistic
     Regression's, but that's a one-time, offline cost that never touches
     a live request -- what matters for the app is inference time on a
-    real request (400 reviews) and serialized model size, and both are a
-    non-issue: ~24ms vs ~0.1ms (both imperceptible next to the
+    real request (1,000 reviews) and serialized model size, and both are
+    a non-issue: ~65ms vs ~0.2ms (both imperceptible next to the
     multi-second Steam API call that already happens per lookup), and
     ~3.2MB vs ~40KB (trivial next to the ~6.6MB CNN quality filter
     already shipped).

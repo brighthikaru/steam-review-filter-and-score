@@ -45,7 +45,7 @@ MODELS_DIR = os.path.join(os.path.dirname(__file__), "..", "models")
 # How many recent reviews to pull for a live lookup. Much smaller than
 # the 20,000-per-game training pulls -- this needs to feel responsive in
 # an app, not exhaustive like the training data collection was.
-LIVE_PULL_TARGET = 400
+LIVE_PULL_TARGET = 1000
 
 
 def to_steam_category(pct_positive):

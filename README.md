@@ -58,7 +58,7 @@ The CNN wins clearly and consistently — precision holds in a tight 0.90-0.96 b
 | TF-IDF + Logistic Regression | 0.961 | 0.914 | 0.937 | 0.959 |
 | **Stacking (LogReg + NB + RF)** | **0.942** | **0.954** | **0.948** | **0.959** |
 
-**Stacking is deployed.** It wins on F1 and recall (0.948/0.954 vs. Logistic Regression's 0.937/0.914) and on agreement with Steam's real vote (91.8% overall vs. Logistic Regression's 90.4%), though it ties Logistic Regression exactly on ROC-AUC (0.959 both) — worth stating plainly rather than only reporting the metric that favours the deployed model. Per-request inference time (~24ms on a realistic 400-review batch) stays negligible next to the multi-second Steam API call the app already makes per lookup.
+**Stacking is deployed.** It wins on F1 and recall (0.948/0.954 vs. Logistic Regression's 0.937/0.914) and on agreement with Steam's real vote (91.8% overall vs. Logistic Regression's 90.4%), though it ties Logistic Regression exactly on ROC-AUC (0.959 both) — worth stating plainly rather than only reporting the metric that favours the deployed model. Per-request inference time (~65ms on a realistic 1,000-review batch) stays negligible next to the multi-second Steam API call the app already makes per lookup.
 
 **Classification threshold.** Both models classify at the default 0.5 probability cutoff — not tuned against a specific precision/recall target, since there's no verified "low-effort" ground truth to tune against (the label itself is a proxy, see Dataset above). In practice this shows up as an asymmetry: the quality filter's precision (0.90-0.96) consistently outpaces its recall, so on the rare miss it leans toward flagging a genuine review rather than letting junk through — the safer direction for a filter feeding a public-facing score, but worth stating rather than leaving implicit. Calibrating this against an explicit target is listed under Future work.
 
@@ -95,7 +95,7 @@ data/raw/               # raw review CSVs
 - English-only scope — the score reflects English-speaking reviewers specifically, not a game's full community.
 - The "low-effort" label is a proxy (very short, OR low playtime, OR duplicate text) — not verified ground truth of "uselessness." A review can be short but insightful, or long but empty.
 - The CNN quality filter and the Stacking sentiment model are both more accurate but less interpretable than a single classical model — the notebook's word-importance analyses use plain Logistic Regression to explain the signal, not either deployed model's own reasoning.
-- Live lookups cap at 400 recent reviews per game for response time — a recent-activity snapshot, not the full review history.
+- Live lookups cap at 1,000 recent reviews per game for response time — a recent-activity snapshot, not the full review history.
 
 ## Future work
 
