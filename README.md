@@ -8,7 +8,7 @@ A one-word "good game" or "bad" tells you someone's vote, but not why — no gam
 
 ## What it does
 
-Pulls a game's recent English-language reviews live from Steam's own API, runs them through a trained model that flags likely low-effort/junk reviews (thin on detail, barely played, or duplicated), and surfaces the longest substantive reviews on each side of the vote — the ones with enough detail to actually help a buying decision. It also shows the sentiment score before vs. after filtering side by side, and runs a second model that predicts sentiment straight from the review text (no access to Steam's own thumbs up/down), shown next to Steam's real vote as a built-in accuracy check.
+Pulls a game's recent English-language reviews live from Steam's own API, runs them through a trained model that flags likely low-effort/junk reviews (thin on detail, barely played, or duplicated), and surfaces the longest substantive reviews on each side of the vote — the ones with enough detail to actually help a buying decision. A third model condenses those surfaced reviews into a couple of plain-English sentences per side ("In short: ..."), so there's a readable takeaway alongside the raw quotes. It also shows the sentiment score before vs. after filtering side by side, and runs a second model that predicts sentiment straight from the review text (no access to Steam's own thumbs up/down), shown next to Steam's real vote as a built-in accuracy check.
 
 Try it: **[steam-review-filter-and-score.streamlit.app](https://steam-review-filter-and-score.streamlit.app/)**
 
@@ -60,7 +60,9 @@ The CNN wins clearly and consistently — precision holds in a tight 0.90-0.96 b
 
 **Stacking is deployed.** It wins on F1 and recall (0.948/0.954 vs. Logistic Regression's 0.937/0.914) and on agreement with Steam's real vote (91.8% overall vs. Logistic Regression's 90.4%), though it ties Logistic Regression exactly on ROC-AUC (0.959 both) — worth stating plainly rather than only reporting the metric that favours the deployed model. Per-request inference time (~65ms on a realistic 1,000-review batch) stays negligible next to the multi-second Steam API call the app already makes per lookup.
 
-**Classification threshold.** Both models classify at the default 0.5 probability cutoff — not tuned against a specific precision/recall target, since there's no verified "low-effort" ground truth to tune against (the label itself is a proxy, see Dataset above). In practice this shows up as an asymmetry: the quality filter's precision (0.90-0.96) consistently outpaces its recall, so on the rare miss it leans toward flagging a genuine review rather than letting junk through — the safer direction for a filter feeding a public-facing score, but worth stating rather than leaving implicit. Calibrating this against an explicit target is listed under Future work.
+**Summarization** — a third model, beyond the two required for the quality-filter/sentiment comparison above: a pretrained `t5-small` (TensorFlow backend, no separate PyTorch dependency) condenses the surfaced positive and negative reviews into a couple of plain-English sentences each. Summarized separately per side rather than blended — mixing "great gameplay" with "terrible bugs" in one prompt produced incoherent, repetitive output in testing (e.g. "it's a powerful and powerful game"); two focused summaries read more coherently. Generation uses beam search (`num_beams=4`) with `no_repeat_ngram_size=3` to directly suppress that repetition failure mode. Deployment memory was a real concern raised before building this — an isolated local test suggested it might not fit Streamlit Community Cloud's free tier, so before shipping it, it was deployed to a separate throwaway app and scored two real games live; no crash, no memory-related restart, confirmed safe. `t5-small` is a small, non-instruction-tuned model, so summaries are serviceable but occasionally rough (typos or grammar quirks carried over from the source review text) — not a fact-checked or polished result, just a readable starting point.
+
+**Classification threshold.** Both quality-filter and sentiment models classify at the default 0.5 probability cutoff — not tuned against a specific precision/recall target, since there's no verified "low-effort" ground truth to tune against (the label itself is a proxy, see Dataset above). In practice this shows up as an asymmetry: the quality filter's precision (0.90-0.96) consistently outpaces its recall, so on the rare miss it leans toward flagging a genuine review rather than letting junk through — the safer direction for a filter feeding a public-facing score, but worth stating rather than leaving implicit. Calibrating this against an explicit target is listed under Future work.
 
 ## Result
 
@@ -96,13 +98,14 @@ data/raw/               # raw review CSVs
 - The "low-effort" label is a proxy (very short, OR low playtime, OR duplicate text) — not verified ground truth of "uselessness." A review can be short but insightful, or long but empty.
 - The CNN quality filter and the Stacking sentiment model are both more accurate but less interpretable than a single classical model — the notebook's word-importance analyses use plain Logistic Regression to explain the signal, not either deployed model's own reasoning.
 - Live lookups cap at 1,000 recent reviews per game for response time — a recent-activity snapshot, not the full review history.
+- The summarizer (`t5-small`) is a small, non-instruction-tuned model — summaries are readable but not polished, and can carry over typos or grammar quirks from the source reviews.
 
 ## Future work
 
 - Validate the quality filter against an even broader genre spread
 - Per-language models beyond English
 - Calibrate the flagging threshold against a real precision/recall target
-- A pretrained transformer (e.g. DistilBERT) for sentiment, to catch sarcasm and mixed-signal reviews — not adopted yet, CPU inference cost is a poor fit for live latency at this scale
+- A pretrained transformer for sentiment specifically (e.g. DistilBERT), to catch sarcasm and mixed-signal reviews — not adopted yet, CPU inference cost on a 1,000-review batch is a poor fit for live latency at this scale (a transformer was adopted for summarization instead, above, where it only ever runs on ~6 already-filtered reviews, not the full batch)
 - Caching and rate-limit handling for high-traffic games
 
 ---
