@@ -148,9 +148,13 @@
   <!-- 2. Problem + example reviews -->
   <section id="slide-problem">
     <div class="kicker">The Problem</div>
-    <h2>Not every review is worth counting</h2>
-    <p class="lead">A one-word "good game" counts exactly the same as a real, thought-out review. That waters down the score.</p>
-    <div class="review-cards">
+    <h2>Not every review tells you why</h2>
+    <div class="icon-row" style="max-width:760px;">
+      <div class="icon-chip"><div class="glyph">💬</div><div class="label">Business Problem</div><div class="sub">Thin reviews don't explain gameplay, bugs, or fit</div></div>
+      <div class="icon-chip"><div class="glyph">🧩</div><div class="label">Data Science Problem</div><div class="sub">Filter junk, then surface the detailed reviews</div></div>
+      <div class="icon-chip"><div class="glyph">👥</div><div class="label">Stakeholders</div><div class="sub">Players wanting real detail before they buy</div></div>
+    </div>
+    <div class="review-cards" style="margin-top:1rem;">
       <div class="review-card junk">
         <div class="rname"><span class="redact">Player_8213</span> · 0.3 hrs played</div>
         <div class="rvote">👍 Recommended</div>
@@ -161,7 +165,7 @@
         <div class="rname"><span class="redact">Player_5590</span> · 41 hrs played</div>
         <div class="rvote">👍 Recommended</div>
         <div>"Fond memories of diving with friends, amazing concept and atmosphere... let down by the devs' constant push to sell you more warbonds."</div>
-        <div class="flag">kept: genuine review</div>
+        <div class="flag">kept: explains why</div>
       </div>
     </div>
     <p class="lead" style="margin-top:0.9rem; font-size:0.85rem;">Real reviews from our dataset, usernames redacted.</p>
@@ -184,17 +188,21 @@
     <p class="lead" style="margin-top:1rem; font-size:0.9rem;">English-only, pulled live from Steam's own API — 140,000 reviews in total.</p>
   </section>
 
-  <!-- 4. Low-effort definition -->
+  <!-- 4. EDA insight -> low-effort definition -->
   <section id="slide-features">
-    <div class="kicker">Defining "Low Effort"</div>
-    <h2>What actually makes a review junk?</h2>
-    <p class="lead">No one hand-labels this, so we built a simple rule from the data itself:</p>
+    <div class="kicker">From Data to Rule</div>
+    <h2>What the data showed — and the rule it led to</h2>
     <div class="icon-row" style="max-width:700px;">
+      <div class="icon-chip"><div class="glyph">📉</div><div class="label">Length spike near zero</div><div class="sub">many reviews are just a handful of characters</div></div>
+      <div class="icon-chip"><div class="glyph">⏱️</div><div class="label">Low-playtime cluster</div><div class="sub">many reviews from under 1 hr played</div></div>
+    </div>
+    <p class="lead" style="margin-top:0.9rem; font-size:0.95rem;">No one hand-labels "low effort," so the rule was built straight from those patterns:</p>
+    <div class="icon-row" style="max-width:700px; margin-top:0.5rem;">
       <div class="icon-chip"><div class="glyph">✂️</div><div class="label">Too short</div><div class="sub">under 20 characters</div></div>
       <div class="icon-chip"><div class="glyph">⏱️</div><div class="label">Barely played</div><div class="sub">under 1 hour</div></div>
       <div class="icon-chip"><div class="glyph">📋</div><div class="label">Copy-pasted</div><div class="sub">duplicate text</div></div>
     </div>
-    <p class="lead" style="margin-top:1.1rem;">Any one of these = flagged. This label only trains the model — the live app judges purely from the words themselves.</p>
+    <p class="lead" style="margin-top:1rem; font-size:0.85rem;">Any one of these = flagged. This label only trains the model — the live app judges purely from the words themselves.</p>
   </section>
 
   <!-- 5. Quality filter results -->
@@ -252,6 +260,7 @@
   <section id="slide-demo">
     <div class="kicker">Live Demo</div>
     <h2>Try it on any game, right now</h2>
+    <p class="lead" style="font-size:0.95rem; margin-bottom:0.8rem;">Not just a score — the app surfaces the actual substantive reviews on each side, so you can read the detail for yourself.</p>
     <div class="demo-frame-wrap">
       <iframe class="demo" id="demoFrame" src="https://steam-review-filter-and-score.streamlit.app/?embed=true"></iframe>
     </div>
@@ -268,7 +277,7 @@
 
     <p class="lead" style="font-size:0.85rem; margin-bottom:0.4rem;">Summary</p>
     <div class="icon-row">
-      <div class="icon-chip"><div class="glyph">🎯</div><div class="label">Real sentiment, text alone</div><div class="sub">No per-game tuning needed</div></div>
+      <div class="icon-chip"><div class="glyph">🎯</div><div class="label">Surfaces the "why," not just a score</div><div class="sub">Filters junk, keeps the detail — no per-game tuning</div></div>
       <div class="icon-chip"><div class="glyph">🔀</div><div class="label">Right model, right job</div><div class="sub">CNN won for junk, Stacking for sentiment</div></div>
     </div>
 

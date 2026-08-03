@@ -3,9 +3,10 @@ live_scoring.py
 
 The inference-time pipeline for the demo app: given a Steam appid, pull
 fresh reviews right now, run them through the trained models, and report
-a "before filter" vs "after filter" sentiment score, plus a side-by-side
-comparison between the sentiment model's own prediction and Steam's real
-vote.
+a "before filter" vs "after filter" sentiment score, a curated sample of
+the substantive (kept) reviews so a player can actually read what people
+said about the game, plus a side-by-side comparison between the
+sentiment model's own prediction and Steam's real vote.
 
 WHY this is a separate module from the notebook/training script: the
 notebook and train_models.py answer "does this approach work, and how
@@ -33,6 +34,7 @@ import joblib
 import pandas as pd
 import tensorflow as tf
 from tensorflow import keras
+from transformers import AutoTokenizer, TFAutoModelForSeq2SeqLM
 
 sys.path.append(os.path.dirname(__file__))
 from features import drop_non_english_reviews
@@ -106,6 +108,37 @@ class SentimentModel:
         return self.model.predict(X), self.model.predict_proba(X)[:, 1]
 
 
+class SummaryModel:
+    """Generates a short natural-language summary of what the surfaced
+    substantive reviews actually say, using a pretrained t5-small
+    (TensorFlow backend -- no separate PyTorch dependency needed since
+    the app already ships TensorFlow for the quality CNN). Only ever
+    runs on the ~6 already-filtered kept reviews (see score_game), not
+    the full pulled batch, so inference stays fast even though the
+    model itself is a generative one.
+
+    MEMORY WARNING, tested 2026-08-03: loading this alongside the CNN
+    quality filter and the sentiment Stacking model pushed combined RSS
+    to ~926MB on a local test (see project docs) -- close to or over
+    Streamlit Community Cloud's free-tier ceiling. This class exists to
+    let that be tested against a real deployment, not because the
+    memory question is already resolved. See README/documentation for
+    the outcome of that test before assuming this is safe to keep.
+    """
+
+    def __init__(self, model_name="t5-small"):
+        self.tokenizer = AutoTokenizer.from_pretrained(model_name)
+        self.model = TFAutoModelForSeq2SeqLM.from_pretrained(model_name)
+
+    def summarize(self, reviews, max_new_tokens=60):
+        if not len(reviews):
+            return None
+        combined = "summarize: " + " ".join(str(r) for r in reviews)
+        inputs = self.tokenizer(combined, return_tensors="tf", max_length=512, truncation=True)
+        out = self.model.generate(**inputs, max_new_tokens=max_new_tokens)
+        return self.tokenizer.decode(out[0], skip_special_tokens=True)
+
+
 def fetch_reviews_df(appid, game_name, target=LIVE_PULL_TARGET):
     """Pulls up to `target` recent reviews for `appid` via the same
     fetch/pull logic collect_reviews.py uses for training data
@@ -120,7 +153,7 @@ def fetch_reviews_df(appid, game_name, target=LIVE_PULL_TARGET):
     return df, len(raw_reviews)
 
 
-def score_game(appid, game_name, quality_model, sentiment_model, target=LIVE_PULL_TARGET):
+def score_game(appid, game_name, quality_model, sentiment_model, target=LIVE_PULL_TARGET, summary_model=None):
     """
     End-to-end: pull -> clean -> filter -> score, both models.
 
@@ -132,6 +165,12 @@ def score_game(appid, game_name, quality_model, sentiment_model, target=LIVE_PUL
         prediction against Steam's real vote (agreement rate),
       - how many reviews were pulled/dropped/flagged,
       - a small sample of flagged reviews for transparency.
+
+    `summary_model` is optional (a SummaryModel instance) -- when
+    provided, a couple-of-sentences summary is generated from the kept
+    reviews. Optional because this is the piece still being validated
+    for deployment memory fit; callers that don't pass one just get
+    "general_sentiment_summary": None.
     """
     df_raw, n_pulled = fetch_reviews_df(appid, game_name, target=target)
     if n_pulled == 0:
@@ -161,6 +200,24 @@ def score_game(appid, game_name, quality_model, sentiment_model, target=LIVE_PUL
 
     flagged = df[df["quality_pred"] == 1].sort_values("quality_score", ascending=False)
 
+    # The kept (substantive) reviews are the actual point of the app for a
+    # player: text detailed enough to explain *why* someone liked or
+    # disliked the game (gameplay mechanics, bugs, pacing, etc.), not just
+    # a thumbs up/down. Longer kept reviews are, on average, the ones most
+    # likely to carry that detail, so surface the longest few on each side
+    # of the vote rather than a random sample -- this is what a player
+    # would actually want to read before buying, which the flagged-junk
+    # sample (kept purely for filter transparency) was never meant to be.
+    kept = df[df["quality_pred"] == 0].copy()
+    kept["review_len"] = kept["review"].fillna("").str.len()
+    kept_positive = kept[kept["voted_up"] == True].sort_values("review_len", ascending=False).head(3)
+    kept_negative = kept[kept["voted_up"] == False].sort_values("review_len", ascending=False).head(3)
+    sample_kept_reviews = pd.concat([kept_positive, kept_negative])
+
+    general_sentiment_summary = None
+    if summary_model is not None:
+        general_sentiment_summary = summary_model.summarize(sample_kept_reviews["review"].tolist())
+
     return {
         "appid": appid,
         "game_name": game_name,
@@ -174,5 +231,7 @@ def score_game(appid, game_name, quality_model, sentiment_model, target=LIVE_PUL
         "category_before": to_steam_category(pct_before),
         "category_after": to_steam_category(pct_after) if pct_after is not None else None,
         "sentiment_agreement_pct": round(agreement_pct, 1),
+        "general_sentiment_summary": general_sentiment_summary,
+        "sample_kept_reviews": sample_kept_reviews[["review", "voted_up", "review_len"]],
         "sample_flagged_reviews": flagged[["review", "voted_up", "quality_score"]].head(10),
     }

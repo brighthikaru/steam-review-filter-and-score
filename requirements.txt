@@ -2,8 +2,10 @@ requests
 pandas
 numpy
 matplotlib
-scikit-learn
+scikit-learn==1.7.2
 scipy
 joblib
 streamlit
 tensorflow-cpu
+transformers==4.46.3
+tf-keras

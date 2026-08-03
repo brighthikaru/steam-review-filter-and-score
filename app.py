@@ -3,9 +3,12 @@ app.py
 
 Streamlit demo: type a game's name (or its Steam appid), pull its most
 recent English-language reviews live, filter out likely low-effort/junk
-reviews with the trained quality model, and show the "real sentiment"
-score before vs. after filtering -- plus a side-by-side comparison of
-our own sentiment model's prediction against Steam's real vote.
+reviews with the trained quality model, and surface the substantive
+reviews underneath -- so a player can actually read what people say
+about the gameplay before buying, instead of just a blended score. Also
+shows the "real sentiment" score before vs. after filtering, plus a
+side-by-side comparison of our own sentiment model's prediction against
+Steam's real vote.
 
 This is the "end-to-end solution (UI, model, data, infrastructure)"
 deliverable -- it reuses the exact same src/features.py and
@@ -33,14 +36,18 @@ import streamlit as st
 # same convention the notebook uses (sys.path.append("../src") there
 # vs. "src" here since this file's own location is the project root).
 sys.path.append("src")
-from live_scoring import QualityModel, SentimentModel, score_game
+from live_scoring import QualityModel, SentimentModel, SummaryModel, score_game
 
 st.set_page_config(page_title="Steam Review Filter & Score", page_icon="🎮", layout="centered")
 
 
 @st.cache_resource
 def load_models():
-    return QualityModel(), SentimentModel()
+    # SummaryModel (t5-small) is the piece being deployment-tested on this
+    # branch for memory fit on Streamlit Community Cloud's free tier --
+    # see live_scoring.SummaryModel's docstring. Not on main until that's
+    # confirmed safe.
+    return QualityModel(), SentimentModel(), SummaryModel()
 
 
 def search_appid_by_name(term):
@@ -68,9 +75,10 @@ def search_appid_by_name(term):
 
 st.title("🎮 Steam Review Filter & Score")
 st.caption(
-    "Pulls a game's recent English-language reviews, filters out ones our model flags "
-    "as low-effort/junk, and shows the real sentiment score before vs. after -- alongside "
-    "our own sentiment model's prediction compared to Steam's real vote."
+    "A one-word 'good' or 'bad' doesn't tell you why. Pulls a game's recent "
+    "English-language reviews, filters out the ones too thin to explain anything, and "
+    "surfaces the substantive reviews underneath -- so you can actually read what people "
+    "say about the gameplay before you buy, not just a blended score."
 )
 
 with st.expander("How this works, and what it can't do"):
@@ -121,13 +129,18 @@ if query:
 
 if appid and st.button("Score this game", type="primary"):
     with st.spinner(f"Pulling reviews for {game_name or appid}..."):
-        quality_model, sentiment_model = load_models()
-        result = score_game(appid, game_name or str(appid), quality_model, sentiment_model)
+        quality_model, sentiment_model, summary_model = load_models()
+        result = score_game(
+            appid, game_name or str(appid), quality_model, sentiment_model, summary_model=summary_model
+        )
 
     if "error" in result:
         st.error(result["error"])
     else:
         st.subheader(result["game_name"])
+
+        if result.get("general_sentiment_summary"):
+            st.info(f"**In short:** {result['general_sentiment_summary']}")
 
         col1, col2 = st.columns(2)
         with col1:
@@ -158,6 +171,26 @@ if appid and st.button("Score this game", type="primary"):
         )
 
         st.divider()
+        st.markdown("##### What players are actually saying")
+        st.caption(
+            "The longest substantive reviews on each side -- the ones with enough detail "
+            "(gameplay, bugs, pacing, value) to actually help you decide, not just a score."
+        )
+        if len(result["sample_kept_reviews"]):
+            col_pos, col_neg = st.columns(2)
+            kept = result["sample_kept_reviews"]
+            with col_pos:
+                st.markdown("**👍 Positive**")
+                for _, row in kept[kept["voted_up"] == True].iterrows():
+                    st.markdown(f"> {row['review'][:400]}")
+            with col_neg:
+                st.markdown("**👎 Negative**")
+                for _, row in kept[kept["voted_up"] == False].iterrows():
+                    st.markdown(f"> {row['review'][:400]}")
+        else:
+            st.caption("No substantive reviews survived filtering for this pull -- try a larger pull or a more-reviewed game.")
+
+        st.divider()
         st.markdown("##### Our sentiment model vs. Steam's real vote")
         st.markdown(
             f"Predicting sentiment from review text alone (no access to Steam's vote), our "
@@ -168,7 +201,7 @@ if appid and st.button("Score this game", type="primary"):
         )
 
         if len(result["sample_flagged_reviews"]):
-            with st.expander("See a sample of flagged reviews (so you can judge for yourself)"):
+            with st.expander("See a sample of the reviews filtered out (so you can judge for yourself)"):
                 for _, row in result["sample_flagged_reviews"].iterrows():
                     vote = "👍" if row["voted_up"] else "👎"
                     st.markdown(f"**{vote} (flag confidence {row['quality_score']:.2f})** — {row['review'][:300]}")

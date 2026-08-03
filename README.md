@@ -4,11 +4,11 @@ Capstone project for my Data Science & AI course (Institute of Data). Built to a
 
 ## The problem
 
-Steam's aggregate review score treats every review equally — a one-word "good game," a one-line meme, and a considered, on-topic critique all count the same toward a game's public score. That makes it hard to tell whether a score reflects genuine community sentiment, or is diluted by noise that says nothing about the game at all. Steam does some internal filtering, but it never shows you a "real sentiment" number. This project builds one.
+A one-word "good game" or "bad" tells you someone's vote, but not why — no gameplay mechanics, no bugs, no pacing, nothing that actually helps another player judge whether the game is for them. Steam's review list mixes these thin, low-information reviews in with the ones that actually explain something, at roughly equal visibility, which makes it harder to find the reviews that would actually inform a buying decision. This project filters out the reviews that don't say much and surfaces the ones that do, so a player can read real detail instead of digging for it — with the before/after sentiment score as a secondary check on how much difference that filtering makes.
 
 ## What it does
 
-Pulls a game's recent English-language reviews live from Steam's own API, runs them through a trained model that flags likely low-effort/junk reviews, and shows the sentiment score before vs. after filtering — side by side, so you can see exactly what changed. It also runs a second model that predicts sentiment straight from the review text (no access to Steam's own thumbs up/down), shown next to Steam's real vote as a built-in accuracy check.
+Pulls a game's recent English-language reviews live from Steam's own API, runs them through a trained model that flags likely low-effort/junk reviews (thin on detail, barely played, or duplicated), and surfaces the longest substantive reviews on each side of the vote — the ones with enough detail to actually help a buying decision. It also shows the sentiment score before vs. after filtering side by side, and runs a second model that predicts sentiment straight from the review text (no access to Steam's own thumbs up/down), shown next to Steam's real vote as a built-in accuracy check.
 
 Try it: **[steam-review-filter-and-score.streamlit.app](https://steam-review-filter-and-score.streamlit.app/)**
 
