@@ -5,3 +5,5 @@ __pycache__/
 venv/
 .DS_Store
 *.egg-info/
+
+test_summarizer_memory.py

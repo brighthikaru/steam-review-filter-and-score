@@ -43,11 +43,19 @@ st.set_page_config(page_title="Steam Review Filter & Score", page_icon="🎮", l
 
 @st.cache_resource
 def load_models():
-    # SummaryModel (t5-small) is the piece being deployment-tested on this
-    # branch for memory fit on Streamlit Community Cloud's free tier --
-    # see live_scoring.SummaryModel's docstring. Not on main until that's
-    # confirmed safe.
     return QualityModel(), SentimentModel(), SummaryModel()
+
+
+def truncate_review(text, limit=400):
+    """Trims a review for display without cutting off mid-word or mid-
+    sentence with no indication anything was cut. Breaks at the last
+    space before `limit` and appends an ellipsis when truncation
+    actually happened, so "gameplay is great but..." doesn't just stop
+    dead with no signal there's more."""
+    text = str(text).strip()
+    if len(text) <= limit:
+        return text
+    return text[:limit].rsplit(" ", 1)[0].rstrip(".,;: ") + "…"
 
 
 def search_appid_by_name(term):
@@ -188,11 +196,11 @@ if appid and st.button("Score this game", type="primary"):
             with col_pos:
                 st.markdown("**👍 Positive**")
                 for _, row in kept[kept["voted_up"] == True].iterrows():
-                    st.markdown(f"> {row['review'][:400]}")
+                    st.markdown(f"> {truncate_review(row['review'])}")
             with col_neg:
                 st.markdown("**👎 Negative**")
                 for _, row in kept[kept["voted_up"] == False].iterrows():
-                    st.markdown(f"> {row['review'][:400]}")
+                    st.markdown(f"> {truncate_review(row['review'])}")
         else:
             st.caption("No substantive reviews survived filtering for this pull -- try a larger pull or a more-reviewed game.")
 
@@ -210,7 +218,7 @@ if appid and st.button("Score this game", type="primary"):
             with st.expander("See a sample of the reviews filtered out (so you can judge for yourself)"):
                 for _, row in result["sample_flagged_reviews"].iterrows():
                     vote = "👍" if row["voted_up"] else "👎"
-                    st.markdown(f"**{vote} (flag confidence {row['quality_score']:.2f})** — {row['review'][:300]}")
+                    st.markdown(f"**{vote} (flag confidence {row['quality_score']:.2f})** — {truncate_review(row['review'], limit=300)}")
                     st.divider()
 
 st.caption(
