@@ -117,26 +117,51 @@ class SummaryModel:
     the full pulled batch, so inference stays fast even though the
     model itself is a generative one.
 
-    MEMORY WARNING, tested 2026-08-03: loading this alongside the CNN
-    quality filter and the sentiment Stacking model pushed combined RSS
-    to ~926MB on a local test (see project docs) -- close to or over
-    Streamlit Community Cloud's free-tier ceiling. This class exists to
-    let that be tested against a real deployment, not because the
-    memory question is already resolved. See README/documentation for
-    the outcome of that test before assuming this is safe to keep.
+    MEMORY, tested live 2026-08-03: deployed and scored two real games
+    (Baldur's Gate 3, Helldivers 2) on Streamlit Community Cloud's free
+    tier alongside the CNN quality filter and Stacking sentiment model
+    -- no crash, no OOM restart. `tensorflow-cpu` on Linux turned out
+    much lighter than the `tensorflow` + Windows combination used for
+    an earlier local estimate (763-926MB), which had suggested more
+    risk than actually exists. Confirmed safe to deploy.
+
+    Summarizes positive and negative kept reviews SEPARATELY (see
+    summarize_sides) rather than blending both into one call -- t5-small
+    is a small, non-instruction-tuned model, and mixing "great gameplay"
+    with "terrible bugs" in one prompt produced incoherent, repetitive
+    output in testing (e.g. "it's a powerful and powerful game"). Two
+    focused summaries read more coherently than one blended one.
     """
 
     def __init__(self, model_name="t5-small"):
         self.tokenizer = AutoTokenizer.from_pretrained(model_name)
         self.model = TFAutoModelForSeq2SeqLM.from_pretrained(model_name)
 
-    def summarize(self, reviews, max_new_tokens=60):
+    def summarize(self, reviews, max_new_tokens=50):
         if not len(reviews):
             return None
-        combined = "summarize: " + " ".join(str(r) for r in reviews)
+        combined = "summarize: " + ". ".join(str(r).rstrip(". ") for r in reviews)
         inputs = self.tokenizer(combined, return_tensors="tf", max_length=512, truncation=True)
-        out = self.model.generate(**inputs, max_new_tokens=max_new_tokens)
+        # Beam search + no_repeat_ngram_size directly targets the
+        # repetition failure mode greedy decoding showed in testing
+        # ("powerful and powerful") -- considers multiple candidate
+        # continuations instead of always taking the single most-likely
+        # next word, and hard-blocks repeating any 3-word phrase.
+        out = self.model.generate(
+            **inputs,
+            max_new_tokens=max_new_tokens,
+            num_beams=4,
+            no_repeat_ngram_size=3,
+            length_penalty=1.2,
+            early_stopping=True,
+        )
         return self.tokenizer.decode(out[0], skip_special_tokens=True)
+
+    def summarize_sides(self, positive_reviews, negative_reviews):
+        """Returns (positive_summary, negative_summary), each generated
+        independently so the model isn't asked to reconcile conflicting
+        sentiment in a single pass."""
+        return self.summarize(positive_reviews), self.summarize(negative_reviews)
 
 
 def fetch_reviews_df(appid, game_name, target=LIVE_PULL_TARGET):
@@ -214,9 +239,11 @@ def score_game(appid, game_name, quality_model, sentiment_model, target=LIVE_PUL
     kept_negative = kept[kept["voted_up"] == False].sort_values("review_len", ascending=False).head(3)
     sample_kept_reviews = pd.concat([kept_positive, kept_negative])
 
-    general_sentiment_summary = None
+    positive_summary, negative_summary = None, None
     if summary_model is not None:
-        general_sentiment_summary = summary_model.summarize(sample_kept_reviews["review"].tolist())
+        positive_summary, negative_summary = summary_model.summarize_sides(
+            kept_positive["review"].tolist(), kept_negative["review"].tolist()
+        )
 
     return {
         "appid": appid,
@@ -231,7 +258,8 @@ def score_game(appid, game_name, quality_model, sentiment_model, target=LIVE_PUL
         "category_before": to_steam_category(pct_before),
         "category_after": to_steam_category(pct_after) if pct_after is not None else None,
         "sentiment_agreement_pct": round(agreement_pct, 1),
-        "general_sentiment_summary": general_sentiment_summary,
+        "positive_summary": positive_summary,
+        "negative_summary": negative_summary,
         "sample_kept_reviews": sample_kept_reviews[["review", "voted_up", "review_len"]],
         "sample_flagged_reviews": flagged[["review", "voted_up", "quality_score"]].head(10),
     }

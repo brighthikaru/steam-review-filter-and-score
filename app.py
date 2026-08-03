@@ -139,8 +139,14 @@ if appid and st.button("Score this game", type="primary"):
     else:
         st.subheader(result["game_name"])
 
-        if result.get("general_sentiment_summary"):
-            st.info(f"**In short:** {result['general_sentiment_summary']}")
+        if result.get("positive_summary") or result.get("negative_summary"):
+            sum_col1, sum_col2 = st.columns(2)
+            with sum_col1:
+                if result.get("positive_summary"):
+                    st.success(f"**👍 In short:** {result['positive_summary']}")
+            with sum_col2:
+                if result.get("negative_summary"):
+                    st.warning(f"**👎 In short:** {result['negative_summary']}")
 
         col1, col2 = st.columns(2)
         with col1:
