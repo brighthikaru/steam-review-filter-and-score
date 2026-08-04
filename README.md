@@ -28,7 +28,9 @@ Try it: **[steam-review-filter-and-score.streamlit.app](https://steam-review-fil
 | Forza Horizon 5 | Racing | 20,000 | 97,866 | 20.4% |
 | Tekken 8 | Fighting | 20,000 | 43,200 | 46.3% |
 
-20,000 per game is a practical cap, not an exhaustive pull — it keeps training time manageable and keeps every game contributing equally to what the models learn as "normal" text. For high-volume games this is a thin recent slice (under 5% of history); for lower-volume games it's closer to their whole recent history — worth knowing when interpreting per-game results.
+20,000 per game is a practical cap, not an exhaustive pull, and three separate reasons drove that choice. First, balance: capping every game at the same number keeps each one contributing equally to what the models learn as "normal" text, so no single title's writing style dominates. Second, recency: reviews are pulled newest-first on purpose — a game can change meaningfully after launch (patches, balance changes, a monetisation controversy), so a review written last month is more representative of the game *today* than one from three years ago. Third, resources: both training time and the live app's per-request latency scale with review count, so the cap keeps the notebook re-runnable and the app responsive.
+
+The trade-off is the flip side of the recency choice: for high-volume games this is a thin *recent* slice (under 5% of history), not a random sample across a game's full lifetime, so it can genuinely diverge from Steam's all-time score if sentiment has shifted recently — see Helldivers 2 in the notebook's EDA section for a real example of this. For lower-volume games the 20,000 cap is closer to their whole recent history, so this effect is much smaller. Worth knowing when interpreting per-game results.
 
 Scoped to English-only — I can't verify a review's sentiment in a language I can't read, so it wouldn't be defensible to include it. Steam's own `language` tag turned out to be reviewer-selected, not content-checked (~1.2% of "english"-tagged reviews were actually in another language), so I added a second, content-based filter on top of it.
 
