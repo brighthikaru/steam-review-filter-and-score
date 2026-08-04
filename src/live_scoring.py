@@ -33,8 +33,8 @@ import sys
 import joblib
 import pandas as pd
 import tensorflow as tf
+from sklearn.feature_extraction.text import ENGLISH_STOP_WORDS, TfidfVectorizer
 from tensorflow import keras
-from transformers import AutoTokenizer, TFAutoModelForSeq2SeqLM
 
 sys.path.append(os.path.dirname(__file__))
 from features import drop_non_english_reviews
@@ -109,59 +109,119 @@ class SentimentModel:
 
 
 class SummaryModel:
-    """Generates a short natural-language summary of what the surfaced
-    substantive reviews actually say, using a pretrained t5-small
-    (TensorFlow backend -- no separate PyTorch dependency needed since
-    the app already ships TensorFlow for the quality CNN). Only ever
-    runs on the ~6 already-filtered kept reviews (see score_game), not
-    the full pulled batch, so inference stays fast even though the
-    model itself is a generative one.
+    """Surfaces the phrases that actually distinguish the positive kept
+    reviews from the negative ones (and vice versa), rendered as
+    "Players liked: X, Y, Z" / "Players disliked: A, B, C" -- this is
+    genuinely how Amazon's own review summaries work under the hood
+    (aspect/keyword extraction), not free-form generated prose. Only
+    ever runs on the ~6 already-filtered kept reviews (see score_game).
 
-    MEMORY, tested live 2026-08-03: deployed and scored two real games
-    (Baldur's Gate 3, Helldivers 2) on Streamlit Community Cloud's free
-    tier alongside the CNN quality filter and Stacking sentiment model
-    -- no crash, no OOM restart. `tensorflow-cpu` on Linux turned out
-    much lighter than the `tensorflow` + Windows combination used for
-    an earlier local estimate (763-926MB), which had suggested more
-    risk than actually exists. Confirmed safe to deploy.
+    WHY EXTRACTIVE, NOT GENERATIVE: four different pretrained seq2seq
+    summarizers were tried here first and each failed a different way:
+      - t5-small: safe on memory, but copy-pasted raw fragments of the
+        source reviews rather than genuinely condensing them.
+      - bart-large-cnn (~400M params): genuinely coherent prose, but
+        OOM-crashed a throwaway Streamlit Community Cloud deployment on
+        its very first real request.
+      - distilbart-cnn-12-6: dead end -- only ships legacy PyTorch
+        weights, no TF/safetensors option, would have required adding
+        PyTorch as a second deep-learning framework just to convert it.
+      - flan-t5-base / flan-t5-small: flan-t5-base hallucinated a detail
+        ("graphics") that appeared in none of the source reviews;
+        flan-t5-small produced vague, one-sided platitudes that ignored
+        genuinely negative reviews in the input entirely.
+    The pattern across all four: within a memory budget that actually
+    fits a free-tier host, no generative model tested stayed reliably
+    grounded in what the reviews actually say. An extractive approach
+    can't hallucinate or drop half the sentiment, because every phrase
+    it surfaces is copied verbatim from an actual kept review -- and it
+    needs no downloaded model at all, using scikit-learn's TfidfVectorizer
+    (already a dependency for the sentiment model), so there is zero
+    additional memory or deployment risk.
 
-    Summarizes positive and negative kept reviews SEPARATELY (see
-    summarize_sides) rather than blending both into one call -- t5-small
-    is a small, non-instruction-tuned model, and mixing "great gameplay"
-    with "terrible bugs" in one prompt produced incoherent, repetitive
-    output in testing (e.g. "it's a powerful and powerful game"). Two
-    focused summaries read more coherently than one blended one.
+    HOW IT WORKS: fits one TF-IDF vectorizer across all kept reviews on
+    both sides combined (so phrases common to both sides, like "game"
+    itself, get naturally down-weighted), then ranks each side's own
+    phrases by their TF-IDF score within that side. The top, non-
+    overlapping phrases per side become the "liked"/"disliked" list.
+
+    STOPWORD HANDLING, non-obvious: stopwords are filtered AFTER
+    n-gram extraction, not before (i.e. NOT passed as `stop_words=` to
+    TfidfVectorizer). Removing stopwords before building bigrams/
+    trigrams makes sklearn build n-grams across the resulting gaps --
+    e.g. "bugs on launch, crashes" becomes the ungrammatical phrase
+    "bugs launch crashes" once "on" is stripped out first. Filtering
+    afterwards (dropping a phrase only if it starts or ends on a
+    filler word) keeps any surfaced multi-word phrase grammatically
+    intact, since the filler words inside it are still there.
     """
 
-    def __init__(self, model_name="t5-small"):
-        self.tokenizer = AutoTokenizer.from_pretrained(model_name)
-        self.model = TFAutoModelForSeq2SeqLM.from_pretrained(model_name)
+    STOPWORDS = ENGLISH_STOP_WORDS.union(
+        {
+            "game", "games", "really", "actually", "basically", "pretty", "quite",
+            "right", "just", "like", "got", "get", "hour", "hours", "time", "lot",
+            "feels", "feel", "day", "days", "thing", "things", "stuff", "way",
+        }
+    )
 
-    def summarize(self, reviews, max_new_tokens=50):
-        if not len(reviews):
-            return None
-        combined = "summarize: " + ". ".join(str(r).rstrip(". ") for r in reviews)
-        inputs = self.tokenizer(combined, return_tensors="tf", max_length=512, truncation=True)
-        # Beam search + no_repeat_ngram_size directly targets the
-        # repetition failure mode greedy decoding showed in testing
-        # ("powerful and powerful") -- considers multiple candidate
-        # continuations instead of always taking the single most-likely
-        # next word, and hard-blocks repeating any 3-word phrase.
-        out = self.model.generate(
-            **inputs,
-            max_new_tokens=max_new_tokens,
-            num_beams=4,
-            no_repeat_ngram_size=3,
-            length_penalty=1.2,
-            early_stopping=True,
-        )
-        return self.tokenizer.decode(out[0], skip_special_tokens=True)
+    def __init__(self, top_n=5):
+        self.top_n = top_n
+
+    def _rank_terms(self, terms, scores):
+        """Returns up to `top_n` non-overlapping phrases, highest score
+        first. Drops single-word filler terms and any phrase that
+        starts or ends on a filler word (see class docstring for why
+        that check happens here rather than in the vectorizer itself).
+        Overlap check drops a phrase if it's a substring of (or
+        contains) one already picked, so "gameplay" and "gameplay
+        mechanics" don't both show up as separate bullets."""
+        candidates = []
+        for term, score in zip(terms, scores):
+            if score <= 0:
+                continue
+            words = term.split()
+            if len(words) == 1 and (words[0] in self.STOPWORDS or len(words[0]) < 3):
+                continue
+            if words[0] in self.STOPWORDS or words[-1] in self.STOPWORDS:
+                continue
+            candidates.append((term, score))
+        candidates.sort(key=lambda pair: -pair[1])
+
+        picked = []
+        for term, _ in candidates:
+            if any(term in kept or kept in term for kept in picked):
+                continue
+            picked.append(term)
+            if len(picked) >= self.top_n:
+                break
+        return picked
 
     def summarize_sides(self, positive_reviews, negative_reviews):
-        """Returns (positive_summary, negative_summary), each generated
-        independently so the model isn't asked to reconcile conflicting
-        sentiment in a single pass."""
-        return self.summarize(positive_reviews), self.summarize(negative_reviews)
+        """Returns (positive_summary, negative_summary) as short
+        "Players liked/disliked: ..." phrase lists, or None for a side
+        with no usable reviews."""
+        pos_texts = [str(r) for r in positive_reviews if str(r).strip()]
+        neg_texts = [str(r) for r in negative_reviews if str(r).strip()]
+        all_texts = pos_texts + neg_texts
+        if not all_texts:
+            return None, None
+
+        vectorizer = TfidfVectorizer(ngram_range=(1, 3), stop_words=None, max_df=0.9, min_df=1)
+        try:
+            tfidf = vectorizer.fit_transform(all_texts)
+        except ValueError:
+            # Can happen if every review is pure stopwords/punctuation --
+            # rare, but fail gracefully rather than crash the app.
+            return None, None
+        terms = vectorizer.get_feature_names_out()
+
+        n_pos = len(pos_texts)
+        pos_terms = self._rank_terms(terms, tfidf[:n_pos].sum(axis=0).A1) if pos_texts else []
+        neg_terms = self._rank_terms(terms, tfidf[n_pos:].sum(axis=0).A1) if neg_texts else []
+
+        positive_summary = f"Players liked: {', '.join(pos_terms)}." if pos_terms else None
+        negative_summary = f"Players disliked: {', '.join(neg_terms)}." if neg_terms else None
+        return positive_summary, negative_summary
 
 
 def fetch_reviews_df(appid, game_name, target=LIVE_PULL_TARGET):
