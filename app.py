@@ -156,27 +156,38 @@ if appid and st.button("Score this game", type="primary"):
                 if result.get("negative_summary"):
                     st.warning(f"**👎 In short:** {result['negative_summary']}")
 
+        # Steam's own category label (e.g. "Mostly Positive") is the headline
+        # here, not the raw percentage -- that's how a player actually reads
+        # a Steam score, and it's the framing this app is meant to mirror.
+        # The percentage is still shown, just as supporting detail underneath,
+        # since a category alone can hide a real swing that doesn't happen to
+        # cross a bucket boundary (e.g. 41% -> 48% is still "Mixed" both ways).
         col1, col2 = st.columns(2)
         with col1:
-            st.metric(
-                "Before filtering",
-                f"{result['pct_positive_before']}% positive",
-                help=result["category_before"],
-            )
-            st.caption(result["category_before"])
+            st.metric("Before filtering", result["category_before"])
+            st.caption(f"{result['pct_positive_before']}% positive")
         with col2:
             if result["pct_positive_after"] is not None:
                 delta = round(result["pct_positive_after"] - result["pct_positive_before"], 1)
                 st.metric(
                     "After filtering",
-                    f"{result['pct_positive_after']}% positive",
-                    delta=f"{delta:+.1f} pts",
-                    help=result["category_after"],
+                    result["category_after"],
+                    delta=f"{delta:+.1f} pts positive",
                 )
-                st.caption(result["category_after"])
+                st.caption(f"{result['pct_positive_after']}% positive")
             else:
                 st.metric("After filtering", "n/a")
                 st.caption("Every pulled review was flagged -- try a larger pull.")
+
+        if (
+            result["pct_positive_after"] is not None
+            and result["category_after"] != result["category_before"]
+        ):
+            st.info(
+                f"**Category shift:** {result['category_before']} → {result['category_after']} "
+                f"once low-effort reviews are filtered out -- a real change in how you'd read "
+                f"this game's reputation, not just a small percentage move."
+            )
 
         st.markdown(
             f"Pulled **{result['n_pulled']}** reviews, dropped **{result['n_dropped_non_english']}** "
