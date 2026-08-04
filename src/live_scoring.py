@@ -110,38 +110,55 @@ class SentimentModel:
 
 class SummaryModel:
     """Generates a short natural-language summary of what the surfaced
-    substantive reviews actually say, using a pretrained t5-small
-    (TensorFlow backend -- no separate PyTorch dependency needed since
-    the app already ships TensorFlow for the quality CNN). Only ever
-    runs on the ~6 already-filtered kept reviews (see score_game), not
-    the full pulled batch, so inference stays fast even though the
+    substantive reviews actually say, using a pretrained summarization
+    model (TensorFlow backend -- no separate PyTorch dependency needed
+    since the app already ships TensorFlow for the quality CNN). Only
+    ever runs on the ~6 already-filtered kept reviews (see score_game),
+    not the full pulled batch, so inference stays fast even though the
     model itself is a generative one.
 
-    MEMORY, tested live 2026-08-03: deployed and scored two real games
-    (Baldur's Gate 3, Helldivers 2) on Streamlit Community Cloud's free
-    tier alongside the CNN quality filter and Stacking sentiment model
-    -- no crash, no OOM restart. `tensorflow-cpu` on Linux turned out
-    much lighter than the `tensorflow` + Windows combination used for
-    an earlier local estimate (763-926MB), which had suggested more
-    risk than actually exists. Confirmed safe to deploy.
+    MODEL: bart-large-cnn (facebook/bart-large-cnn), swapped in from an
+    earlier t5-small version. t5-small is a small, general-purpose
+    seq2seq model with no summarization-specific training -- on messy,
+    informal multi-review text it tended to just copy/paste fragments
+    of the source reviews rather than genuinely condense them (e.g.
+    "if you have an authority kink, come and get some I am always the
+    guy who will climb them"). bart-large-cnn is actually trained for
+    this task (fine-tuned on the CNN/DailyMail summarization dataset),
+    so it's expected to produce more coherent, genuinely-condensed
+    output. Tradeoff: ~400M parameters vs t5-small's ~60M, so real
+    memory risk on Streamlit Community Cloud's free tier -- MUST be
+    memory-tested locally and live before this is trusted long-term
+    (see test_summarizer_memory.py / README "Summarization" section
+    for the testing story). Untested as of this docstring being
+    written -- update this note once verified.
 
     Summarizes positive and negative kept reviews SEPARATELY (see
-    summarize_sides) rather than blending both into one call -- t5-small
-    is a small, non-instruction-tuned model, and mixing "great gameplay"
-    with "terrible bugs" in one prompt produced incoherent, repetitive
-    output in testing (e.g. "it's a powerful and powerful game"). Two
-    focused summaries read more coherently than one blended one.
+    summarize_sides) rather than blending both into one call -- mixing
+    "great gameplay" with "terrible bugs" in one prompt produced
+    incoherent output with the earlier t5-small model, and there's no
+    reason to expect blending suddenly works better with a different
+    model. Two focused summaries read more coherently than one blended
+    one.
     """
 
-    def __init__(self, model_name="t5-small"):
+    def __init__(self, model_name="facebook/bart-large-cnn"):
+        self.model_name = model_name
         self.tokenizer = AutoTokenizer.from_pretrained(model_name)
         self.model = TFAutoModelForSeq2SeqLM.from_pretrained(model_name)
 
-    def summarize(self, reviews, max_new_tokens=50):
+    def summarize(self, reviews, max_new_tokens=80):
         if not len(reviews):
             return None
-        combined = "summarize: " + ". ".join(str(r).rstrip(". ") for r in reviews)
-        inputs = self.tokenizer(combined, return_tensors="tf", max_length=512, truncation=True)
+        # The "summarize: " prefix is a T5-specific convention (T5 is
+        # trained as a multi-task model that reads its task off a text
+        # prefix) -- BART has no such convention and doesn't need it.
+        text = ". ".join(str(r).rstrip(". ") for r in reviews)
+        combined = f"summarize: {text}" if "t5" in self.model_name.lower() else text
+        # max_length 1024 (vs the earlier 512) matches what bart-large-cnn
+        # was actually trained on; using 512 here would needlessly
+        # truncate input it was designed to handle.
+        inputs = self.tokenizer(combined, return_tensors="tf", max_length=1024, truncation=True)
         # Beam search + no_repeat_ngram_size directly targets the
         # repetition failure mode greedy decoding showed in testing
         # ("powerful and powerful") -- considers multiple candidate
@@ -150,9 +167,10 @@ class SummaryModel:
         out = self.model.generate(
             **inputs,
             max_new_tokens=max_new_tokens,
+            min_length=15,
             num_beams=4,
             no_repeat_ngram_size=3,
-            length_penalty=1.2,
+            length_penalty=2.0,
             early_stopping=True,
         )
         return self.tokenizer.decode(out[0], skip_special_tokens=True)

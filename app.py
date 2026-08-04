@@ -151,10 +151,10 @@ if appid and st.button("Score this game", type="primary"):
             sum_col1, sum_col2 = st.columns(2)
             with sum_col1:
                 if result.get("positive_summary"):
-                    st.success(f"**👍 In short:** {result['positive_summary']}")
+                    st.success(f"**👍 TL;DR:** {result['positive_summary']}")
             with sum_col2:
                 if result.get("negative_summary"):
-                    st.warning(f"**👎 In short:** {result['negative_summary']}")
+                    st.warning(f"**👎 TL;DR:** {result['negative_summary']}")
 
         # Steam's own category label (e.g. "Mostly Positive") is the headline
         # here, not the raw percentage -- that's how a player actually reads
