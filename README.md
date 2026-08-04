@@ -99,13 +99,16 @@ data/raw/               # raw review CSVs
 - The CNN quality filter and the Stacking sentiment model are both more accurate but less interpretable than a single classical model — the notebook's word-importance analyses use plain Logistic Regression to explain the signal, not either deployed model's own reasoning.
 - Live lookups cap at 1,000 recent reviews per game for response time — a recent-activity snapshot, not the full review history.
 - The "Players liked/disliked" summary is extractive (TF-IDF phrases, not generated text) — it can only surface words that are already in the kept reviews, so it won't produce fluent connecting prose the way a generative model would, and on a very small or repetitive kept-review sample it may surface fewer than 5 phrases per side.
+- The extraction only runs on the curated ~6-review sample (the 3 longest kept reviews per side, see "What players are actually saying"), not the full pulled batch — a phrase that's common across the wider 1,000-review pull but happens not to appear in those specific 6 reviews won't be surfaced. Quality is also uneven: proper nouns (a developer's name, for instance) can end up on both the liked and disliked lists if they're mentioned in both a positive and a negative review, and some surfaced words (e.g. "different," "people") are vaguer than others (e.g. "credits," "supplies") — TF-IDF ranks by statistical distinctiveness, not by human judgement of which word is most informative.
 
 ## Future work
 
 - Validate the quality filter against an even broader genre spread
 - Per-language models beyond English
 - Calibrate the flagging threshold against a real precision/recall target
-- A pretrained transformer for sentiment specifically (e.g. DistilBERT), to catch sarcasm and mixed-signal reviews — not adopted yet, CPU inference cost on a 1,000-review batch is a poor fit for live latency at this scale (a transformer was adopted for summarization instead, above, where it only ever runs on ~6 already-filtered reviews, not the full batch)
+- A pretrained transformer for sentiment specifically (e.g. DistilBERT), to catch sarcasm and mixed-signal reviews — not adopted yet, CPU inference cost on a 1,000-review batch is a poor fit for live latency at this scale
+- A genuine sentiment-aware summarizer — the current "Players liked/disliked" feature is extractive keyword-matching (see Known limitations above), not a model that understands and writes about sentiment. A properly-sized, purpose-built summarization model (memory-safe on a free-tier host, unlike the four generative attempts tried and rejected here) is the natural next step toward real prose summaries.
+- Filter and summarize across the **full pulled batch** (up to 1,000 reviews), not just the curated ~6-review sample shown today — this was the original goal driving this feature (surfacing what players broadly say, not just a handful of the longest reviews), and is the most direct way to close that gap. Would need a scalable approach (e.g. aggregating TF-IDF or a batched summarization pass across all kept reviews, not just the sample) since running a generative model on 1,000 reviews per request isn't feasible at interactive speed on this hosting tier.
 - Caching and rate-limit handling for high-traffic games
 
 ---
