@@ -7,3 +7,5 @@ scipy
 joblib
 streamlit
 tensorflow-cpu
+transformers==4.46.3
+tf-keras

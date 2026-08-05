@@ -85,7 +85,16 @@
   }
   iframe.demo { width: 100%; height: 100%; border: none; border-radius: 6px; background: #fff; }
   .game-cell { display: flex; align-items: center; gap: 0.6rem; }
-  .game-thumb { height: 30px; border-radius: 4px; display: block; }
+  .game-thumb {
+    /* Fixed width AND height (not just height) so every row's thumbnail takes
+       up identical space regardless of source image aspect ratio -- local
+       assets range from 2.08:1 to 2.38:1, and Cyberpunk 2077 pulls a live
+       image straight from Steam's CDN with its own ratio. Without a fixed
+       width, each row's game name started at a slightly different x
+       position, since flexbox sizes the image by its natural (rendered)
+       width. object-fit: cover crops to fill this box without distortion. */
+    width: 64px; height: 30px; object-fit: cover; border-radius: 4px; display: block; flex-shrink: 0;
+  }
 
   /* bar chart */
   .barchart { display: flex; flex-direction: column; gap: 0.55rem; margin-top: 1rem; max-width: 640px; }
@@ -122,7 +131,17 @@
   .icon-row { display: flex; gap: 1.4rem; margin-top: 1.1rem; }
   .icon-chip { flex: 1; background: var(--panel); border: 1px solid #2a2e37; border-radius: 10px; padding: 1rem 0.8rem; text-align: center; }
   .icon-chip .glyph { font-size: 1.6rem; margin-bottom: 0.4rem; }
-  .icon-chip .label { font-size: 0.88rem; color: var(--text); font-weight: 600; }
+  .icon-chip .label {
+    font-size: 0.88rem; color: var(--text); font-weight: 600;
+    /* Fixed line-height + min-height reserve room for 2 lines, whether a
+       given label actually wraps or not (e.g. "Data Science Problem" wraps
+       to 2 lines in a 3-up row, "Stakeholders" doesn't) -- otherwise the
+       .sub line underneath starts at a different y in every chip that
+       wraps differently, which is what looked "unaligned" across the row.
+       Reserving the same space regardless of actual line count keeps every
+       .sub line starting at the same height across the whole row. */
+    line-height: 1.25; min-height: 2.2em; display: flex; align-items: center; justify-content: center;
+  }
   .icon-chip .sub { font-size: 0.78rem; color: var(--muted); margin-top: 0.25rem; }
 
   footer.slide-footer { position: absolute; bottom: 2vh; left: 8vw; color: var(--muted); font-size: 0.8rem; }
@@ -266,13 +285,13 @@
     <div class="icon-row">
       <div class="icon-chip"><div class="glyph">🎯</div><div class="label">Surfaces the "why," not just a score</div><div class="sub">Filters junk, keeps the detail — no per-game tuning</div></div>
       <div class="icon-chip"><div class="glyph">🔀</div><div class="label">Right model, right job</div><div class="sub">CNN won for junk, Stacking for sentiment</div></div>
-      <div class="icon-chip"><div class="glyph">📝</div><div class="label">Bonus: "liked/disliked" extraction</div><div class="sub">TF-IDF phrases, chosen after 4 generative models failed</div></div>
+      <div class="icon-chip"><div class="glyph">📝</div><div class="label">Bonus: generated "liked/disliked" summary</div><div class="sub">Real prose, on the 5th summarizer tried</div></div>
     </div>
 
     <p class="lead" style="font-size:0.85rem; margin:1.3rem 0 0.4rem;">Next Up</p>
     <div class="icon-row">
       <div class="icon-chip"><div class="glyph">📚</div><div class="label">Summarize the full batch</div><div class="sub">Not just the ~6-review sample — my original goal</div></div>
-      <div class="icon-chip"><div class="glyph">💬</div><div class="label">Sentiment-aware summarizer</div><div class="sub">Real prose, once a memory-safe model exists</div></div>
+      <div class="icon-chip"><div class="glyph">💬</div><div class="label">Unify multi-review summaries</div><div class="sub">One coherent pass, not joined per-review parts</div></div>
       <div class="icon-chip"><div class="glyph">🌐</div><div class="label">Other languages</div><div class="sub">Beyond English-only scope</div></div>
       <div class="icon-chip"><div class="glyph">🤖</div><div class="label">Pretrained transformer for sentiment</div><div class="sub">Catch sarcasm &amp; mixed signals</div></div>
     </div>
@@ -282,7 +301,7 @@
   <section id="slide-demo">
     <div class="kicker">Live Demo</div>
     <h2>Try it on any game, right now</h2>
-    <p class="lead" style="font-size:0.95rem; margin-bottom:0.8rem;">Not just a score — the app surfaces the actual substantive reviews on each side, plus a "players liked / disliked" phrase summary of each side, so you can read the detail for yourself.</p>
+    <p class="lead" style="font-size:0.95rem; margin-bottom:0.8rem;">Not just a score — the app surfaces the actual substantive reviews on each side, plus a generated "players liked / disliked" summary of each side, so you can read the detail for yourself.</p>
     <div class="demo-frame-wrap">
       <iframe class="demo" id="demoFrame" src="https://steam-review-filter-and-score.streamlit.app/?embed=true"></iframe>
     </div>
