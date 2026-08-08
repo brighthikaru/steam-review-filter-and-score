@@ -4,11 +4,11 @@ Capstone project for my Data Science & AI course (Institute of Data). Built to a
 
 ## The problem
 
-A one-word "good game" or "bad" tells you someone's vote, but not why — no gameplay mechanics, no bugs, no pacing, nothing that actually helps another player judge whether the game is for them. Steam's review list mixes these thin, low-information reviews in with the ones that actually explain something, at roughly equal visibility, which makes it harder to find the reviews that would actually inform a buying decision. This project filters out the reviews that don't say much and surfaces the ones that do, so a player can read real detail instead of digging for it — with the before/after sentiment score as a secondary check on how much difference that filtering makes.
+A one-word "good game" or "bad" tells you someone's vote, but not why — no gameplay mechanics, no bugs, no pacing, nothing that actually helps another player judge whether the game is for them. Steam's review list mixes these thin, low-information reviews in with the ones that actually explain something, at roughly equal visibility, which makes it harder to find the reviews that would actually inform a buying decision. This project filters out the reviews that don't say much and shows the ones that do, so a player can read real detail instead of digging for it — with the before/after sentiment score as a secondary check on how much difference that filtering makes.
 
 ## What it does
 
-Pulls a game's recent English-language reviews live from Steam's own API, runs them through a trained model that flags likely low-effort/junk reviews (thin on detail, barely played, or duplicated), and surfaces the longest substantive reviews on each side of the vote — the ones with enough detail to actually help a buying decision. A third component generates a plain-English "Players liked: ...", "Players disliked: ..." summary from those kept reviews, so there's a readable takeaway alongside the raw quotes. It also shows the sentiment score before vs. after filtering, led by Steam's own category label (e.g. "Mostly Positive") rather than the raw percentage — that's the number a player actually reads on Steam, so it's the headline here too, with the percentage kept underneath as supporting detail, and an explicit callout when filtering shifts the game into a different category entirely. A second model predicts sentiment straight from the review text (no access to Steam's own thumbs up/down), shown next to Steam's real vote as a built-in accuracy check.
+Pulls a game's recent English-language reviews live from Steam's own API, runs them through a trained model that flags likely low-effort/junk reviews (thin on detail, barely played, or duplicated), and shows the longest, most detailed reviews on each side of the vote — the ones with enough detail to actually help a buying decision. A third component generates a plain-English "Players liked: ...", "Players disliked: ..." summary from those kept reviews, so there's a readable takeaway alongside the raw quotes. It also shows the sentiment score before vs. after filtering, led by Steam's own category label (e.g. "Mostly Positive") rather than the raw percentage — that's the number a player actually reads on Steam, so it's the headline here too, with the percentage kept underneath as supporting detail, and an explicit callout when filtering shifts the game into a different category entirely. A second model predicts sentiment straight from the review text (no access to Steam's own thumbs up/down), shown next to Steam's real vote as a built-in accuracy check.
 
 Try it: **[steam-review-filter-and-score.streamlit.app](https://steam-review-filter-and-score.streamlit.app/)**
 
@@ -62,7 +62,7 @@ The CNN wins clearly and consistently — precision holds in a tight 0.90-0.96 b
 
 **Stacking is deployed.** It wins on F1 and recall (0.948/0.954 vs. Logistic Regression's 0.937/0.914) and on agreement with Steam's real vote (91.8% overall vs. Logistic Regression's 90.4%), though it ties Logistic Regression exactly on ROC-AUC (0.959 both) — worth stating plainly rather than only reporting the metric that favours the deployed model. Per-request inference time (~65ms on a realistic 1,000-review batch) stays negligible next to the multi-second Steam API call the app already makes per lookup.
 
-**Summarization** — a third component, beyond the two required models for the quality-filter/sentiment comparison above: generates a plain-English "Players liked: ..." / "Players disliked: ..." summary from the kept reviews. This is a bonus feature, not a formally compared third model — unlike the quality-filter and sentiment tables above, there's no precision/recall/ROC-AUC to score a summary against, so what follows is a build log, not a metrics comparison. Seven approaches were tried, in this order, before landing on the deployed one:
+**Summarisation** — a third component, beyond the two required models for the quality-filter/sentiment comparison above: generates a plain-English "Players liked: ..." / "Players disliked: ..." summary from the kept reviews. This is a bonus feature, not a formally compared third model — unlike the quality-filter and sentiment tables above, there's no precision/recall/ROC-AUC to score a summary against, so what follows is a build log, not a metrics comparison. Seven approaches were tried, in this order, before landing on the deployed one:
 
 | Approach | Outcome | Why rejected / replaced |
 |---|---|---|
@@ -72,9 +72,9 @@ The CNN wins clearly and consistently — precision holds in a tight 0.90-0.96 b
 | `flan-t5-base` | Hallucinated | Invented a detail ("graphics") present in none of the source reviews |
 | `flan-t5-small` | Vague, one-sided | Ignored genuinely negative reviews in the input, produced generic praise |
 | TF-IDF (extractive) | Safe, grounded | Couldn't hallucinate, but also couldn't produce real prose — comma-separated phrases only |
-| **`Falconsai/text_summarization`** | **Deployed** | Same memory class as generic `t5-small` (60.5M params, 242MB) but fine-tuned specifically for summarization — coherent, hallucination-free output across multiple test runs |
+| **`Falconsai/text_summarization`** | **Deployed** | Same memory class as generic `t5-small` (60.5M params, 242MB) but fine-tuned specifically for summarisation — coherent, hallucination-free output across multiple test runs |
 
-That still left one problem: summarizing several reviews in a single pass reliably dropped at least one review from the output entirely, the same failure mode that sank the original `t5-small`, just less severe — the model would lock onto whichever single review read as most "quotable" and ignore the rest. The fix was **method, not model**: each kept review is summarized individually (much closer to the single-document task this model was actually fine-tuned on), and the short results are joined together — so no single review can be dropped, since every one gets its own generation pass. Full before/after test output for both approaches is in `test_summarizer_memory.py`.
+That still left one problem: summarising several reviews in a single pass reliably dropped at least one review from the output entirely, the same failure mode that sank the original `t5-small`, just less severe — the model would lock onto whichever single review read as most "quotable" and ignore the rest. The fix was **method, not model**: each kept review is summarised individually (much closer to the single-document task this model was actually fine-tuned on), and the short results are joined together — so no single review can be dropped, since every one gets its own generation pass. Full before/after test output for both approaches is in `test_summarizer_memory.py`.
 
 **Classification threshold.** Both quality-filter and sentiment models classify at the default 0.5 probability cutoff — not tuned against a specific precision/recall target, since there's no verified "low-effort" ground truth to tune against (the label itself is a proxy, see Dataset above). In practice this shows up as an asymmetry: the quality filter's precision (0.90-0.96) consistently outpaces its recall, so on the rare miss it leans toward flagging a genuine review rather than letting junk through — the safer direction for a filter feeding a public-facing score, but worth stating rather than leaving implicit. Calibrating this against an explicit target is listed under Future work.
 
@@ -89,7 +89,7 @@ pip install -r requirements.txt
 streamlit run app.py
 ```
 
-Needs the trained model artifacts in `models/` — regenerate them with:
+Needs the trained model artefacts in `models/` — regenerate them with:
 
 ```
 python src/train_models.py
@@ -101,7 +101,7 @@ python src/train_models.py
 app.py                  # Streamlit app
 src/                    # collection, feature engineering, training, live scoring
 notebooks/              # full analysis notebook + write-up
-models/                 # trained model artifacts (CNN + joblib)
+models/                 # trained model artefacts (CNN + joblib)
 presentation/           # HTML slide deck with embedded live demo
 data/raw/               # raw review CSVs
 ```
@@ -113,7 +113,7 @@ data/raw/               # raw review CSVs
 - The CNN quality filter and the Stacking sentiment model are both more accurate but less interpretable than a single classical model — the notebook's word-importance analyses use plain Logistic Regression to explain the signal, not either deployed model's own reasoning.
 - Live lookups cap at 1,000 recent reviews per game for response time — a recent-activity snapshot, not the full review history.
 - The "Players liked/disliked" summary is generated text (Falconsai/text_summarization), not extracted phrases — it reads as fluent prose, but that also means it *can* in principle paraphrase or compress in a way that shifts emphasis, even though local testing across multiple runs showed no outright hallucination (no detail appearing that wasn't in the source review).
-- Summarization only runs on the curated ~6-review sample (the 3 longest kept reviews per side, see "What players are actually saying"), not the full pulled batch — a sentiment that's common across the wider 1,000-review pull but happens not to appear in those specific 6 reviews won't be reflected. Each review is summarized independently and the results joined, so the output reads as several short sentences back-to-back rather than one fully unified paragraph — a deliberate trade-off (see Summarization above) to guarantee every review is represented, at some cost to flow.
+- Summarisation only runs on the curated ~6-review sample (the 3 longest kept reviews per side, see "What players are actually saying"), not the full pulled batch — a sentiment that's common across the wider 1,000-review pull but happens not to appear in those specific 6 reviews won't be reflected. Each review is summarised independently and the results joined, so the output reads as several short sentences back-to-back rather than one fully unified paragraph — a deliberate trade-off (see Summarisation above) to guarantee every review is represented, at some cost to flow.
 
 ## Future work
 
@@ -121,8 +121,8 @@ data/raw/               # raw review CSVs
 - Per-language models beyond English
 - Calibrate the flagging threshold against a real precision/recall target
 - A pretrained transformer for sentiment specifically (e.g. DistilBERT), to catch sarcasm and mixed-signal reviews — not adopted yet, CPU inference cost on a 1,000-review batch is a poor fit for live latency at this scale
-- A summary that unifies across reviews into one flowing paragraph, rather than joining independently-generated per-review summaries (see Summarization above) — the current per-review approach was chosen deliberately to guarantee no review gets dropped, but a model that can synthesize across multiple documents in one coherent pass without losing that guarantee would read more naturally.
-- Filter and summarize across the **full pulled batch** (up to 1,000 reviews), not just the curated ~6-review sample shown today — this was the original goal driving this feature (surfacing what players broadly say, not just a handful of the longest reviews), and is the most direct way to close that gap. Would need a scalable approach (e.g. a batched summarization pass across all kept reviews, not just the sample) since running a generative model on 1,000 reviews per request isn't feasible at interactive speed on this hosting tier.
+- A summary that unifies across reviews into one flowing paragraph, rather than joining independently-generated per-review summaries (see Summarisation above) — the current per-review approach was chosen deliberately to guarantee no review gets dropped, but a model that can synthesise across multiple documents in one coherent pass without losing that guarantee would read more naturally.
+- Filter and summarise across the **full pulled batch** (up to 1,000 reviews), not just the curated ~6-review sample shown today — this was the original goal driving this feature (showing what players broadly say, not just a handful of the longest reviews), and is the most direct way to close that gap. Would need a scalable approach (e.g. a batched summarisation pass across all kept reviews, not just the sample) since running a generative model on 1,000 reviews per request isn't feasible at interactive speed on this hosting tier.
 - Caching and rate-limit handling for high-traffic games
 
 ---
