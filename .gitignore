@@ -7,3 +7,9 @@ venv/
 *.egg-info/
 
 test_summarizer_memory.py
+experiments/
+HFSummaryToken.txt
+personal_notes/
+presentation/
+Project_Documentation.pdf
+Steam_Review_Filter_Submission.zip

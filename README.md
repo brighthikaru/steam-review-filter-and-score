@@ -4,7 +4,7 @@ Capstone project for my Data Science & AI course (Institute of Data). Built to a
 
 ## The problem
 
-A one-word "good game" or "bad" tells you someone's vote, but not why — no gameplay mechanics, no bugs, no pacing, nothing that actually helps another player judge whether the game is for them. Steam's review list mixes these thin, low-information reviews in with the ones that actually explain something, at roughly equal visibility, which makes it harder to find the reviews that would actually inform a buying decision. This project filters out the reviews that don't say much and shows the ones that do, so a player can read real detail instead of digging for it — with the before/after sentiment score as a secondary check on how much difference that filtering makes.
+A one-word "good game" or "bad" tells you someone's vote, but not why — no gameplay mechanics, no bugs, no pacing, nothing that actually helps another player judge whether the game is for them. Steam's review list mixes these thin, low-information reviews in with the ones that actually explain something, at roughly equal visibility, which makes it harder to find the reviews that would actually inform a buying decision. This project filters out the reviews that don't say much, shows the ones that do, and gives a real sentiment score based on what's left — so a player can see a game's actual current sentiment, backed by a plain-English summary of what people are saying, to help decide whether it's worth their time.
 
 ## What it does
 
@@ -62,7 +62,7 @@ The CNN wins clearly and consistently — precision holds in a tight 0.90-0.96 b
 
 **Stacking is deployed.** It wins on F1 and recall (0.948/0.954 vs. Logistic Regression's 0.937/0.914) and on agreement with Steam's real vote (91.8% overall vs. Logistic Regression's 90.4%), though it ties Logistic Regression exactly on ROC-AUC (0.959 both) — worth stating plainly rather than only reporting the metric that favours the deployed model. Per-request inference time (~65ms on a realistic 1,000-review batch) stays negligible next to the multi-second Steam API call the app already makes per lookup.
 
-**Summarisation** — a third component, beyond the two required models for the quality-filter/sentiment comparison above: generates a plain-English "Players liked: ..." / "Players disliked: ..." summary from the kept reviews. This is a bonus feature, not a formally compared third model — unlike the quality-filter and sentiment tables above, there's no precision/recall/ROC-AUC to score a summary against, so what follows is a build log, not a metrics comparison. Seven approaches were tried, in this order, before landing on the deployed one:
+**Summarisation** — the third part of the original goal: filter the junk, score the real sentiment, and summarise it in plain English so a player can act on it without reading everything themselves. It generates a "Players liked: ..." / "Players disliked: ..." summary from the kept reviews. Unlike the quality-filter and sentiment models above, there's no precision/recall/ROC-AUC to score a generated summary against, so what follows is a build log, not a metrics comparison. Seven approaches were tried, in this order, before landing on the deployed one:
 
 | Approach | Outcome | Why rejected / replaced |
 |---|---|---|
